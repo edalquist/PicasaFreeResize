@@ -1,3 +1,5 @@
+package org.dalquist.picasa;
+
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -237,7 +239,6 @@ public class BatchResize {
             this.resizeRequest = resizeRequest;
         }
 
-        @Override
         public ResizeRequest call() throws Exception {
             System.out.println("\t\tResizing: " + resizeRequest.photoEntry.getTitle().getPlainText());
             
