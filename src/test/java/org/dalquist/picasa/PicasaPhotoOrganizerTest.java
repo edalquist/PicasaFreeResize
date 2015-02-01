@@ -3,9 +3,9 @@ package org.dalquist.picasa;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
 import java.util.Properties;
 
 import org.junit.Before;
@@ -16,21 +16,20 @@ import org.mockito.runners.MockitoJUnitRunner;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import com.google.gdata.data.photos.AlbumEntry;
 import com.google.gdata.util.AuthenticationException;
 import com.google.gdata.util.ServiceException;
 
 @RunWith(MockitoJUnitRunner.class)
-public class SimplePicasaServiceImplTest {
+public class PicasaPhotoOrganizerTest {
   private static ImmutableMap<String, String> testConfig;
-  private SimplePicasaServiceImpl service;
+  private PicasaPhotoOrganizer organizer;
 
   @BeforeClass
   public static void setupStatic() throws IOException, AuthenticationException {
     Properties testProperties = new Properties();
 
     try (InputStream testPropertiesStream =
-        SimplePicasaServiceImplTest.class.getResourceAsStream("/test.properties")) {
+        PicasaPhotoOrganizerTest.class.getResourceAsStream("/test.properties")) {
       if (testPropertiesStream == null) {
         fail("test.properties is missing, copy and populate test.properties.sample");
       }
@@ -48,29 +47,17 @@ public class SimplePicasaServiceImplTest {
     String password = testConfig.get("google.password");
     assertThat(password).isNotNull();
 
-    service = new SimplePicasaServiceImpl(username, password);
+    organizer = new PicasaPhotoOrganizer(username, password);
   }
 
   @Test
   public void testListAllPhotos() throws IOException, ServiceException {
-    List<AlbumEntry> albums = service.getAlbums();
-    assertThat(albums).isNotNull();
-
-//    int totalPhotos = 0;
-//    for (AlbumEntry albumEntry : albums) {
-//      System.out.println(albumEntry.getDate() + ", " + albumEntry.getName() + ", "
-//          + albumEntry.getTitle().getPlainText() + ", " + albumEntry.getPhotosLeft() + ", "
-//          + albumEntry.getPhotosUsed());
-//
-//      int albumPhotos = 0;
-//      for (PhotoEntry photoEntry : service.getPhotos(albumEntry)) {
-////         System.out.println("\t" + objectMapper.writeValueAsString(photoEntry));
-//        totalPhotos++;
-//        albumPhotos++;
-//      }
-//      System.out.println("\t" + albumPhotos);
-//    }
-//    System.out.println(totalPhotos);
+    PhotosDatabase pdb = new PhotosDatabase();
+    organizer.loadPhotoEntries(pdb);
+    
+    try (FileWriter out = new FileWriter("/Users/edalquist/tmp/photos_db.csv")) {
+      pdb.writeAsCsv(out);
+    }
   }
 
 }

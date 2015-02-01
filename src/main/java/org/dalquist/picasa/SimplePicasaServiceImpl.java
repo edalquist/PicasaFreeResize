@@ -10,7 +10,6 @@ import java.util.List;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.gdata.client.photos.PicasawebService;
-import com.google.gdata.data.Link;
 import com.google.gdata.data.photos.AlbumEntry;
 import com.google.gdata.data.photos.AlbumFeed;
 import com.google.gdata.data.photos.PhotoEntry;
@@ -38,7 +37,7 @@ public class SimplePicasaServiceImpl {
     Collections.sort(albumEntries, new Comparator<AlbumEntry>() {
       @Override
       public int compare(AlbumEntry o1, AlbumEntry o2) {
-        return o2.getDate().compareTo(o1.getDate());
+        return o1.getDate().compareTo(o2.getDate());
       }
     });
     return albumEntries;
@@ -51,7 +50,7 @@ public class SimplePicasaServiceImpl {
     do {
       final URL albumFeedUrl =
           new URL("https://picasaweb.google.com/data/feed/api/user/default/albumid/"
-              + albumEntry.getGphotoId() + "?imgmax=u&start-index=" + (totalEntries.size() + 1));
+              + albumEntry.getGphotoId() + "?imgmax=d&start-index=" + (totalEntries.size() + 1));
 
       albumFeed = picasaService.getFeed(albumFeedUrl, AlbumFeed.class);
       List<PhotoEntry> photoEntries = albumFeed.getPhotoEntries();
