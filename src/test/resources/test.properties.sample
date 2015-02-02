@@ -4,3 +4,6 @@
 #
 google.username=
 google.password=
+
+photodb.file=/tmp/photos_db.csv
+

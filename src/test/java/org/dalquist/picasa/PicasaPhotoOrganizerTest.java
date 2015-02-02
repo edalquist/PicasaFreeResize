@@ -3,7 +3,6 @@ package org.dalquist.picasa;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
 
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -52,12 +51,10 @@ public class PicasaPhotoOrganizerTest {
 
   @Test
   public void testListAllPhotos() throws IOException, ServiceException {
-    PhotosDatabase pdb = new PhotosDatabase();
+    PhotosDatabase pdb = new PhotosDatabase(testConfig.get("photodb.file"));
     organizer.loadPhotoEntries(pdb);
     
-    try (FileWriter out = new FileWriter("/Users/edalquist/tmp/photos_db.csv")) {
-      pdb.writeAsCsv(out);
-    }
+    pdb.save();
   }
 
 }

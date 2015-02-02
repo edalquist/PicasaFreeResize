@@ -2,10 +2,8 @@ package org.dalquist.picasa;
 
 import org.joda.time.DateTime;
 
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
-@JsonPropertyOrder(alphabetic = true)
 public class MediaEntry {
   private String id;
   private String source;
