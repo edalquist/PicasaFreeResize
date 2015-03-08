@@ -1,9 +1,0 @@
-#
-# Please use App Passwords here for added security
-# https://support.google.com/accounts/answer/185833?hl=en
-#
-google.username=
-google.password=
-
-photodb.file=/tmp/photos_db.csv
-

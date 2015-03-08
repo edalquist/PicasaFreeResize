@@ -1,4 +1,4 @@
-package org.dalquist.picasa;
+package org.dalquist.photos.survey.picasa;
 
 import java.io.IOException;
 import java.net.URL;

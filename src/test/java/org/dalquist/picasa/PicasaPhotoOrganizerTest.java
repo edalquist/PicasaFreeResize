@@ -7,6 +7,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
+import org.dalquist.photos.survey.PhotoOrganizer;
+import org.dalquist.photos.survey.PhotosDatabase;
+import org.dalquist.photos.survey.picasa.PicasaPhotoOrganizer;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -21,7 +24,7 @@ import com.google.gdata.util.ServiceException;
 @RunWith(MockitoJUnitRunner.class)
 public class PicasaPhotoOrganizerTest {
   private static ImmutableMap<String, String> testConfig;
-  private PicasaPhotoOrganizer organizer;
+  private PhotoOrganizer organizer;
 
   @BeforeClass
   public static void setupStatic() throws IOException, AuthenticationException {

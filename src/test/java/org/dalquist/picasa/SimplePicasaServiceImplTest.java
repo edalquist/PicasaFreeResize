@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Properties;
 
+import org.dalquist.photos.survey.picasa.SimplePicasaServiceImpl;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;

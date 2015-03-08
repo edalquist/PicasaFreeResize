@@ -1,4 +1,4 @@
-package org.dalquist.picasa;
+package org.dalquist.photos.survey;
 
 import org.joda.time.DateTime;
 
@@ -8,6 +8,7 @@ public class MediaEntry {
   private String id;
   private String source;
   private String account;
+  private String thumbUrl;
   private String url;
   private String filename;
   private long width;
@@ -26,6 +27,14 @@ public class MediaEntry {
 
   public void setExifUniqueId(String exifUniqueId) {
     this.exifUniqueId = exifUniqueId;
+  }
+  
+  public String getThumbUrl() {
+    return thumbUrl;
+  }
+
+  public void setThumbUrl(String thumbUrl) {
+    this.thumbUrl = thumbUrl;
   }
 
   public String getUrl() {

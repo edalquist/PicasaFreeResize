@@ -1,4 +1,4 @@
-package org.dalquist.picasa;
+package org.dalquist.photos.survey;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -13,12 +13,6 @@ public class JacksonUtils {
     registerModules(mapper);
     return mapper;
   }
-  
-//  public static CsvMapper getCsvMapper() {
-//    CsvMapper mapper = new CsvMapper();
-//    registerModules(mapper);
-//    return mapper;
-//  }
 
   private static void registerModules(ObjectMapper mapper) {
     mapper.registerModule(new JodaModule());
