@@ -1,27 +1,27 @@
 {
-    "photodb.file":"/Users/myuser/tmp/photos_db.json",
+    "photoDbFile":"/Users/user1/tmp/photos_db.json",
     "sources":[
         {
-            "id":"picasa:user1",
+            "id":"user1",
             "type":"Picasa",
             "username":"user1@gmail.com",
             "password":"USE_AN_APP_PASSWORD"
         },
         {
-            "id":"picasa:user2",
+            "id":"user2",
             "type":"Picasa",
             "username":"user2@gmail.com",
             "password":"USE_AN_APP_PASSWORD"
         },
         {
-            "id":"iphoto:comp:myuser",
+            "id":"apollo:user1",
             "type":"iPhoto",
-            "album.xml":"/Users/myuser/Pictures/iPhoto Library.photolibrary/AlbumData.xml"
+            "albumXml":"/Users/user1/Pictures/iPhoto Library.photolibrary/AlbumData.xml"
         },
         {
-            "id":"iphoto:comp:ouser",
+            "id":"apollo:user2",
             "type":"iPhoto",
-            "album.xml":"/Users/ouser/Pictures/iPhoto Library/AlbumData.xml"
+            "albumXml":"/Users/user2/Pictures/iPhoto Library/AlbumData.xml"
         }
     ]
 }

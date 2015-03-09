@@ -9,3 +9,5 @@ Scripts for image comparison
 	http://www.fmwconcepts.com/imagemagick/phashcompare/index.php
 		compares two 168 digit phash values
 
+Add source specific logic/tracking to the db to allow it to avoid parsing the entire source worth of data
+	AlbumFeed has <updated>2015-01-30T23:51:51.862Z</updated> so I just need a list of album Ids and their last-updated timestamps

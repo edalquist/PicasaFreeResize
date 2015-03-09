@@ -4,10 +4,10 @@ import java.io.IOException;
 
 import org.dalquist.photos.survey.MediaEntry;
 import org.dalquist.photos.survey.PhotoOrganizer;
+import org.dalquist.photos.survey.PhotoSurveyRunner.Source;
 import org.dalquist.photos.survey.PhotosDatabase;
 import org.joda.time.DateTime;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.gdata.data.media.mediarss.MediaContent;
 import com.google.gdata.data.media.mediarss.MediaThumbnail;
@@ -23,12 +23,12 @@ public class PicasaPhotoOrganizer implements PhotoOrganizer {
   private final SimplePicasaServiceImpl picasaService;
   private final String id;
 
-  public PicasaPhotoOrganizer(JsonNode config) throws AuthenticationException {
-    this.id = config.get("id").textValue();
+  public PicasaPhotoOrganizer(Source config) throws AuthenticationException {
+    this.id = config.getId();
     Preconditions.checkNotNull(this.id);
 
-    String username = config.get("username").textValue();
-    String password = config.get("password").textValue();
+    String username = config.get("username");
+    String password = config.get("password");
     this.picasaService = new SimplePicasaServiceImpl(username, password);
   }
 

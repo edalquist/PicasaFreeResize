@@ -9,7 +9,8 @@ import java.io.Writer;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,7 +18,7 @@ import com.google.common.collect.Iterators;
 import com.google.common.io.Files;
 
 public final class PhotosDatabase {
-  private Set<MediaEntry> photos = new HashSet<>();
+  private SortedSet<MediaEntry> photos = new TreeSet<MediaEntry>();
   private final File dbFile;
 
   public PhotosDatabase(String filename) throws IOException {
@@ -44,7 +45,7 @@ public final class PhotosDatabase {
 
       List<MediaEntry> photosBuilder = new LinkedList<>();
       Iterators.addAll(photosBuilder, mediaEntryItr);
-      photos = new HashSet<>(photosBuilder);
+      photos = new TreeSet<>(photosBuilder);
       
       int dupeCount = photosBuilder.size() - photos.size();
       if (dupeCount > 0) {
@@ -67,5 +68,9 @@ public final class PhotosDatabase {
     } finally {
       tempFile.delete();
     }
+  }
+  
+  static class DatabaseRoot {
+    private SortedSet<MediaEntry> mediaEntries;
   }
 }
