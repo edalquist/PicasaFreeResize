@@ -7,6 +7,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.List;
 
+import org.dalquist.photos.survey.iphoto.IPhotoOrganizer;
 import org.dalquist.photos.survey.picasa.PicasaPhotoOrganizer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -15,7 +16,8 @@ import com.google.common.collect.ImmutableMap;
 
 public class PhotoSurveyRunner {
   private final static ImmutableMap<String, Class<? extends PhotoOrganizer>> SOURCES = ImmutableMap
-      .of(PicasaPhotoOrganizer.SOURCE, PicasaPhotoOrganizer.class);
+      .of(PicasaPhotoOrganizer.SOURCE, PicasaPhotoOrganizer.class,
+          IPhotoOrganizer.SOURCE, IPhotoOrganizer.class);
 
   public static void main(String[] args) throws Exception {
     Config config = readConfig();
@@ -26,13 +28,18 @@ public class PhotoSurveyRunner {
     
     // Iterate through sources
     for (Source source : config.getSources()) {
+      if (new Boolean(source.get("skip"))) {
+        System.out.println("Skipping source: " + source.getId() + ":" + source.getType());
+        continue;
+      }
+
       PhotoOrganizer sourceOrganizer = createOrganizer(source);
-      System.out.println("Parsing photos from: " + source.getId());
+      System.out.println("Parsing photos from: " + source.getId() + ":" + source.getType());
       
       sourceOrganizer.loadPhotoEntries(pdb);
       
       // Save the db after each source
-      System.out.println("Parsed photos from: " + source.getId());
+      System.out.println("Parsed photos from: " + source.getId() + ":" + source.getType());
       pdb.save();
     }
   }

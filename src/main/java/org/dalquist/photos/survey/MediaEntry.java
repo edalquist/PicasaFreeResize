@@ -1,10 +1,15 @@
 package org.dalquist.photos.survey;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import org.joda.time.DateTime;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ComparisonChain;
+import com.google.common.collect.Ordering;
 
-public class MediaEntry {
+public class MediaEntry implements Comparable<MediaEntry> {
   private String id;
   private String source;
   private String account;
@@ -16,10 +21,14 @@ public class MediaEntry {
   private long bytes;
   private DateTime created;
   private String phash;
-  private String albumId;
-  private String albumName;
   private String mimeType;
   private String exifUniqueId;
+  private Set<Album> albums;
+  
+  @Override
+  public int compareTo(MediaEntry o) {
+    return ComparisonChain.start().compare(id, o.id, Ordering.natural().nullsLast()).result();
+  }
 
   public String getExifUniqueId() {
     return exifUniqueId;
@@ -53,20 +62,15 @@ public class MediaEntry {
     this.mimeType = mimeType;
   }
 
-  public String getAlbumId() {
-    return albumId;
+  public Set<Album> getAlbums() {
+    if (albums == null) {
+      albums = new HashSet<>();
+    }
+    return albums;
   }
 
-  public void setAlbumId(String albumId) {
-    this.albumId = albumId;
-  }
-
-  public String getAlbumName() {
-    return albumName;
-  }
-
-  public void setAlbumName(String albumName) {
-    this.albumName = albumName;
+  public void setAlbums(Set<Album> albums) {
+    this.albums = albums;
   }
 
   public String getId() {

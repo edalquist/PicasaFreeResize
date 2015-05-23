@@ -2,6 +2,7 @@ package org.dalquist.photos.survey.picasa;
 
 import java.io.IOException;
 
+import org.dalquist.photos.survey.Album;
 import org.dalquist.photos.survey.MediaEntry;
 import org.dalquist.photos.survey.PhotoOrganizer;
 import org.dalquist.photos.survey.PhotoSurveyRunner.Source;
@@ -24,8 +25,7 @@ public class PicasaPhotoOrganizer implements PhotoOrganizer {
   private final String id;
 
   public PicasaPhotoOrganizer(Source config) throws AuthenticationException {
-    this.id = config.getId();
-    Preconditions.checkNotNull(this.id);
+    this.id = Preconditions.checkNotNull(config.getId());
 
     String username = config.get("username");
     String password = config.get("password");
@@ -37,9 +37,6 @@ public class PicasaPhotoOrganizer implements PhotoOrganizer {
     this.picasaService = new SimplePicasaServiceImpl(username, password);
   }
 
-  /* (non-Javadoc)
-   * @see org.dalquist.photos.survey.picasa.PhotoOrganizer#loadPhotoEntries(org.dalquist.photos.survey.PhotosDatabase)
-   */
   @Override
   public void loadPhotoEntries(PhotosDatabase pdb) throws IOException, ServiceException {
     for (AlbumEntry albumEntry : this.picasaService.getAlbums()) {
@@ -56,8 +53,11 @@ public class PicasaPhotoOrganizer implements PhotoOrganizer {
       throws ServiceException {
     MediaEntry np = new MediaEntry();
 
-    np.setAlbumId(albumId);
-    np.setAlbumName(albumTitle);
+    Album album = new Album();
+    album.setAlbumId(albumId);
+    album.setAlbumName(albumTitle);
+    np.getAlbums().add(album);
+
     np.setBytes(photoEntry.getSize());
     np.setCreated(new DateTime(photoEntry.getTimestamp()));
     np.setFilename(photoEntry.getTitle().getPlainText());
