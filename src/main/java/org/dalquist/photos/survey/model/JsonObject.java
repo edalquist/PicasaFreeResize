@@ -1,0 +1,35 @@
+package org.dalquist.photos.survey.model;
+
+import org.dalquist.photos.survey.JacksonUtils;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class JsonObject {
+  private static final ObjectMapper OBJECT_MAPPER = JacksonUtils.getObjectMapper();
+
+  protected final JsonNode getJson() {
+    return OBJECT_MAPPER.convertValue(this, JsonNode.class);
+  }
+  
+  @Override
+  public final int hashCode() {
+    return getJson().hashCode();
+  }
+
+  @Override
+  public final boolean equals(Object obj) {
+    if (obj == this) {
+      return true;
+    }
+    if (!obj.getClass().equals(obj.getClass())) {
+      return false;
+    }
+    return getJson().equals(((JsonObject)obj).getJson());
+  }
+
+  @Override
+  public final String toString() {
+    return getJson().toString();
+  }
+}

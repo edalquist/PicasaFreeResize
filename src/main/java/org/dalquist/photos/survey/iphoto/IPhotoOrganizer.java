@@ -5,15 +5,29 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import javax.xml.parsers.ParserConfigurationException;
 
-import org.dalquist.photos.survey.Album;
-import org.dalquist.photos.survey.MediaEntry;
+import org.apache.commons.io.input.CountingInputStream;
 import org.dalquist.photos.survey.PhotoOrganizer;
 import org.dalquist.photos.survey.PhotoSurveyRunner.Source;
 import org.dalquist.photos.survey.PhotosDatabase;
+import org.dalquist.photos.survey.model.Album;
+import org.dalquist.photos.survey.model.Media;
+import org.dalquist.photos.survey.model.MediaId;
+import org.dalquist.photos.survey.model.Resource;
 import org.xml.sax.SAXException;
 
 import com.dd.plist.NSArray;
@@ -21,22 +35,41 @@ import com.dd.plist.NSDictionary;
 import com.dd.plist.NSObject;
 import com.dd.plist.PropertyListFormatException;
 import com.dd.plist.PropertyListParser;
+import com.drew.imaging.FileType;
+import com.drew.imaging.FileTypeDetector;
+import com.drew.imaging.ImageMetadataReader;
+import com.drew.imaging.ImageProcessingException;
+import com.drew.metadata.Metadata;
+import com.drew.metadata.jpeg.JpegDirectory;
+import com.drew.metadata.png.PngDirectory;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Maps.EntryTransformer;
+import com.google.common.hash.Hashing;
+import com.google.common.hash.HashingInputStream;
+import com.google.common.io.BaseEncoding;
+import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.gdata.util.AuthenticationException;
 import com.google.gdata.util.ServiceException;
 
 public class IPhotoOrganizer implements PhotoOrganizer {
   public static final String SOURCE = "iPhoto";
 
+  private final ListeningExecutorService executor;
   private final String id;
   private final String albumXml;
 
   public IPhotoOrganizer(Source config) throws AuthenticationException {
     this.id = Preconditions.checkNotNull(config.getId());
     this.albumXml = Preconditions.checkNotNull(config.get("album.xml"));
+    
+    int cores = Runtime.getRuntime().availableProcessors();
+    System.out.println("Processing with " + cores + " cores");
+    this.executor =
+        MoreExecutors.listeningDecorator(new ThreadPoolExecutor(cores, cores, 60, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<Runnable>(), new ThreadPoolExecutor.CallerRunsPolicy()));
   }
 
   @Override
@@ -51,8 +84,40 @@ public class IPhotoOrganizer implements PhotoOrganizer {
 
     NSDictionary imagesDict = (NSDictionary) rootDict.get("Master Image List");
 
-    Map<String, MediaEntry> mediaMap =
-        ImmutableMap.copyOf(Maps.transformEntries(imagesDict, new MediaEntryBuilder()));
+    // Convert each image to a Media via a thread pool
+    List<ListenableFuture<Media>> mediaFutures = new ArrayList<>(imagesDict.size());
+    for (final Entry<String, NSObject> mediaEntry : imagesDict.entrySet()) {
+      mediaFutures.add(executor.submit(new Callable<Media>() {
+        @Override
+        public Media call() throws Exception {
+          return transformEntry(mediaEntry.getKey(), mediaEntry.getValue());
+        }
+      }));
+    }
+
+    // Wait for all the threads to complete and get a List<Media>
+    List<Media> mediaList;
+    try {
+      mediaList = Futures.successfulAsList(mediaFutures).get();
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    }
+
+    // Turn the list into a Map
+    Map<String, Media> mediaMap = new HashMap<>();
+    for (ListIterator<Media> listIterator = mediaList.listIterator(); listIterator.hasNext();) {
+      Media media = listIterator.next();
+      if (media == null) {
+        // This should result in the original exception being thrown
+        try {
+          mediaFutures.get(listIterator.previousIndex()).get();
+        } catch (InterruptedException | ExecutionException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      mediaMap.put(media.getMediaId().getId(), media);
+    }
+    
 
     NSArray albums = (NSArray) rootDict.get("List of Albums");
     for (NSObject albumObj : albums.getArray()) {
@@ -65,17 +130,16 @@ public class IPhotoOrganizer implements PhotoOrganizer {
       }
 
       Album album = new Album();
-      album.setAlbumId(nsToInt(nsAlbum.get("AlbumId")).toString());
-      album.setAlbumName(nsToString(nsAlbum.get("AlbumName")));
+      album.setId(nsToInt(nsAlbum.get("AlbumId")).toString());
+      album.setName(nsToString(nsAlbum.get("AlbumName")));
 
       NSArray imageKeys = (NSArray) nsAlbum.get("KeyList");
       for (NSObject imageKey : imageKeys.getArray()) {
-        MediaEntry me = mediaMap.get(nsToString(imageKey));
+        Media me = mediaMap.get(nsToString(imageKey));
         if (me == null) {
-          // WTF
-        } else {
-          me.getAlbums().add(album);
+          throw new IllegalStateException("No image found for: " + imageKey);
         }
+        me.getAlbums().add(album);
       }
     }
 
@@ -84,21 +148,20 @@ public class IPhotoOrganizer implements PhotoOrganizer {
       NSDictionary roll = (NSDictionary) rollObj;
 
       Album album = new Album();
-      album.setAlbumId(nsToInt(roll.get("RollID")).toString());
-      album.setAlbumName(nsToString(roll.get("RollName")));
+      album.setId(nsToInt(roll.get("RollID")).toString());
+      album.setName(nsToString(roll.get("RollName")));
 
       NSArray imageKeys = (NSArray) roll.get("KeyList");
       for (NSObject imageKey : imageKeys.getArray()) {
-        MediaEntry me = mediaMap.get(nsToString(imageKey));
+        Media me = mediaMap.get(nsToString(imageKey));
         if (me == null) {
-          // WTF
-        } else {
-          me.getAlbums().add(album);
+          throw new IllegalStateException("No image found for: " + imageKey);
         }
+        me.getAlbums().add(album);
       }
     }
 
-    for (MediaEntry entry : mediaMap.values()) {
+    for (Media entry : mediaMap.values()) {
       pdb.add(entry);
     }
   }
@@ -115,39 +178,119 @@ public class IPhotoOrganizer implements PhotoOrganizer {
     return obj == null ? null : type.cast(obj.toJavaObject());
   }
 
-  private final class MediaEntryBuilder implements EntryTransformer<String, NSObject, MediaEntry> {
-    @Override
-    public MediaEntry transformEntry(String key, NSObject value) {
-      NSDictionary imageDict = (NSDictionary) value;
-      MediaEntry np = new MediaEntry();
+  public Media transformEntry(String key, NSObject value) {
+    NSDictionary imageDict = (NSDictionary) value;
 
-      // np.setBytes(imageDict.);
-      // np.setCreated(new DateTime(photoEntry.getTimestamp()));
-      np.setId(key);
-      // ExifTags exifTags = photoEntry.getExifTags();
-      // if (exifTags != null) {
-      // np.setExifUniqueId(exifTags.getImageUniqueID());
-      // }
-      // np.setPhash(phash); TODO calculate this via IM
-      np.setSource(SOURCE);
-      np.setAccount(id);
+    MediaId mId = new MediaId();
+    mId.setId(key); //GUID?
+    mId.setSource(SOURCE);
+    mId.setAccount(id);
+    
+    Media m = new Media();
+    m.setMediaId(mId);
 
-      np.setThumbUrl(nsToString(imageDict.get("ThumbPath")));
+    // TODO read file data from FS
+    // np.setCreated(new DateTime(photoEntry.getTimestamp()));
 
-      // np.setWidth(content.getWidth());
-      // np.setHeight(content.getHeight());
+    // ExifTags exifTags = photoEntry.getExifTags();
+    // if (exifTags != null) {
+    // np.setExifUniqueId(exifTags.getImageUniqueID());
+    // }
+    // np.setPhash(phash); TODO calculate this via IM
 
-      // TODO convert to mimeType
-      np.setMimeType(nsToString(imageDict.get("MediaType")));
-
-      String path = nsToString(imageDict.get("OriginalPath"));
-      if (path == null) {
-        path = nsToString(imageDict.get("ImagePath"));
-      }
-      np.setUrl(path);
-      np.setFilename(path); // TODO basename the path
-
-      return np;
+    // TODO convert to mimeType
+    m.setMimeType(nsToString(imageDict.get("MediaType")));
+    
+    Set<Resource> resources = m.getResources();
+    Resource thumb = createImageResource(nsToString(imageDict.get("ThumbPath")));
+    if (thumb != null) {
+      thumb.setDescription("Thumb");
+      resources.add(thumb);
     }
+    
+    if ("Image".equals(m.getMimeType())) {
+      Resource original = createImageResource(nsToString(imageDict.get("OriginalPath")));
+      Resource image = createImageResource(nsToString(imageDict.get("ImagePath")));
+      image.setDescription("Image");
+      if (original != null) {
+        original.setPrimary(true);
+        original.setDescription("Original");
+        resources.add(original);
+      } else {
+        image.setPrimary(true);
+      }
+      resources.add(image);
+    } else {
+      System.err.println("Unhandled MediaType: " + m.getMimeType());
+      // Assume video?
+    }
+
+    return m;
+  }
+    
+  private Resource createImageResource(String file) {
+    if (file == null) {
+      return null;
+    }
+    Resource resource = new Resource();
+    resource.setUrl(file);
+    
+    FileType fileType;
+    CountingInputStream countingStream;
+    HashingInputStream hashingStream;
+    Metadata metadata;
+    try (FileInputStream fis = new FileInputStream(file)) {
+      BufferedInputStream bis = new BufferedInputStream(fis);
+      fileType = FileTypeDetector.detectFileType(bis);
+
+      countingStream = new CountingInputStream(bis);
+      hashingStream = new HashingInputStream(Hashing.sha1(), countingStream);
+      metadata = ImageMetadataReader.readMetadata(hashingStream);
+      
+      // Read the whole stream to ensure the count and hash data is correct
+      ByteStreams.copy(hashingStream, ByteStreams.nullOutputStream());
+    } catch (ImageProcessingException | IOException e) {
+      throw new RuntimeException("Failed to read: " + file, e);
+    }
+
+    // TODO figure out how to capture this in JSON
+//      for (Directory directory : metadata.getDirectories()) {
+//        for (Tag tag : directory.getTags()) {
+//          System.out.println(tag);
+//        }
+//      }
+    
+//      ExifSubIFDDirectory directory = metadata.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
+//      Date date = directory.getDate(ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL);
+    try {
+      // TODO do I need to capture this or just capture all metadata?
+      switch (fileType) {
+        case Jpeg: {
+          JpegDirectory jpegDirectory = metadata.getFirstDirectoryOfType(JpegDirectory.class);
+          resource.setWidth(jpegDirectory.getInt(JpegDirectory.TAG_IMAGE_WIDTH));
+          resource.setHeight(jpegDirectory.getInt(JpegDirectory.TAG_IMAGE_HEIGHT));
+          break;
+        }
+          
+        case Png: {
+          PngDirectory pngDirectory = metadata.getFirstDirectoryOfType(PngDirectory.class);
+          resource.setWidth(pngDirectory.getInt(PngDirectory.TAG_IMAGE_WIDTH));
+          resource.setHeight(pngDirectory.getInt(PngDirectory.TAG_IMAGE_HEIGHT));
+          break;
+        }
+
+        default:
+          System.err.println("Unhandled FileType: " + fileType);
+          break;
+      }
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to read: " + file, e);
+    }
+
+    resource.setBytes(countingStream.getByteCount());
+//      resource.setHeight(0);
+//      resource.setWidth(0);
+    resource.setSha(BaseEncoding.base64Url().encode(hashingStream.hash().asBytes()));
+    return resource;
   }
 }
