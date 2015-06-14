@@ -1,23 +1,29 @@
 package org.dalquist.photos.survey;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.joda.JodaModule;
+import java.io.IOException;
+import java.io.InputStream;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
+import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+
+@Service
 public final class JacksonUtils {
-  private static class LazyHolder {
-    private static final JacksonUtils INSTANCE = new JacksonUtils();
-  }
-  
-  public static ObjectMapper getObjectMapper() {
-    return LazyHolder.INSTANCE.objectMapper;
+  private final ResourceLoader resourceLoader;
+
+  @Autowired
+  public JacksonUtils(ResourceLoader resourceLoader) {
+    this.resourceLoader = resourceLoader;
   }
 
-  private final ObjectMapper objectMapper;
-
-  private JacksonUtils() {
-    objectMapper = new ObjectMapper();
-    objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
-    objectMapper.registerModule(new JodaModule());
+  public <T> T read(String configFile, Class<T> type) throws IOException,
+      JsonProcessingException {
+    Resource resource = resourceLoader.getResource(configFile);
+    try (InputStream in = resource.getInputStream()) {
+      return ObjectMapperHolder.getObjectMapper().reader(type).readValue(in);
+    }
   }
 }

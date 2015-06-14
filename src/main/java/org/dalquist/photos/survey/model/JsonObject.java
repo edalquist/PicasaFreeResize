@@ -1,12 +1,12 @@
 package org.dalquist.photos.survey.model;
 
-import org.dalquist.photos.survey.JacksonUtils;
+import org.dalquist.photos.survey.ObjectMapperHolder;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class JsonObject {
-  private static final ObjectMapper OBJECT_MAPPER = JacksonUtils.getObjectMapper();
+  private static final ObjectMapper OBJECT_MAPPER = ObjectMapperHolder.getObjectMapper();
 
   protected final JsonNode getJson() {
     return OBJECT_MAPPER.convertValue(this, JsonNode.class);

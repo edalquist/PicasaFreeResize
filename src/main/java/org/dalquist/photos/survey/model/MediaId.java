@@ -4,15 +4,13 @@ import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.Ordering;
 
 public class MediaId extends JsonObject implements Comparable<MediaId> {
+  private SourceId sourceId;
   private String id;
-  private String source;
-  private String account;
-  
+
   @Override
   public int compareTo(MediaId o) {
     return ComparisonChain.start()
-        .compare(source, o.source, Ordering.natural().nullsLast())
-        .compare(account, o.account, Ordering.natural().nullsLast())
+        .compare(sourceId, o.sourceId, Ordering.natural().nullsLast())
         .compare(id, o.id, Ordering.natural().nullsLast())
         .result();
   }
@@ -25,19 +23,11 @@ public class MediaId extends JsonObject implements Comparable<MediaId> {
     this.id = id;
   }
 
-  public String getSource() {
-    return source;
+  public SourceId getSourceId() {
+    return sourceId;
   }
 
-  public void setSource(String source) {
-    this.source = source;
-  }
-
-  public String getAccount() {
-    return account;
-  }
-
-  public void setAccount(String account) {
-    this.account = account;
+  public void setSourceId(SourceId sourceId) {
+    this.sourceId = sourceId;
   }
 }

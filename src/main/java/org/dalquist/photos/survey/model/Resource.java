@@ -13,6 +13,7 @@ public class Resource extends JsonObject implements Comparable<Resource> {
   private long bytes;
   private String sha;
   private String phash;
+  // TODO store the JSON from ImageMagick here
   
   @Override
   public int compareTo(Resource o) {

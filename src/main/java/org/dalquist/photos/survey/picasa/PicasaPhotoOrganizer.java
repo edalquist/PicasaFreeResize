@@ -3,18 +3,13 @@ package org.dalquist.photos.survey.picasa;
 import java.io.IOException;
 
 import org.dalquist.photos.survey.PhotoOrganizer;
-import org.dalquist.photos.survey.PhotoSurveyRunner.Source;
-import org.dalquist.photos.survey.model.Album;
+import org.dalquist.photos.survey.PhotosDatabase;
 import org.dalquist.photos.survey.model.Media;
 import org.dalquist.photos.survey.model.MediaId;
-import org.dalquist.photos.survey.PhotosDatabase;
-import org.joda.time.DateTime;
+import org.dalquist.photos.survey.model.Source;
+import org.dalquist.photos.survey.model.SourceId;
 
-import com.google.common.base.Preconditions;
-import com.google.gdata.data.media.mediarss.MediaContent;
-import com.google.gdata.data.media.mediarss.MediaThumbnail;
 import com.google.gdata.data.photos.AlbumEntry;
-import com.google.gdata.data.photos.ExifTags;
 import com.google.gdata.data.photos.PhotoEntry;
 import com.google.gdata.util.AuthenticationException;
 import com.google.gdata.util.ServiceException;
@@ -23,30 +18,29 @@ public class PicasaPhotoOrganizer implements PhotoOrganizer {
   public static final String SOURCE = "Picasa";
 
   private final SimplePicasaServiceImpl picasaService;
-  private final String id;
+  private final SourceId sourceId;
 
   public PicasaPhotoOrganizer(Source config) throws AuthenticationException {
-    this.id = Preconditions.checkNotNull(config.getId());
+    this.sourceId = config.getSourceId();
 
     String username = config.get("username");
     String password = config.get("password");
     this.picasaService = new SimplePicasaServiceImpl(username, password);
   }
 
-  public PicasaPhotoOrganizer(String username, String password) throws AuthenticationException {
-    this.id = SOURCE;
-    this.picasaService = new SimplePicasaServiceImpl(username, password);
-  }
-
   @Override
-  public void loadPhotoEntries(PhotosDatabase pdb) throws IOException, ServiceException {
-    for (AlbumEntry albumEntry : this.picasaService.getAlbums()) {
-      String albumId = albumEntry.getGphotoId();
-      String albumTitle = albumEntry.getTitle().getPlainText();
-      for (PhotoEntry photoEntry : this.picasaService.getPhotos(albumEntry)) {
-        Media np = convert(photoEntry, albumId, albumTitle);
-        pdb.add(np);
+  public void loadPhotoEntries(PhotosDatabase pdb) throws IOException {
+    try {
+      for (AlbumEntry albumEntry : this.picasaService.getAlbums()) {
+        String albumId = albumEntry.getGphotoId();
+        String albumTitle = albumEntry.getTitle().getPlainText();
+        for (PhotoEntry photoEntry : this.picasaService.getPhotos(albumEntry)) {
+          Media np = convert(photoEntry, albumId, albumTitle);
+          pdb.add(np);
+        }
       }
+    } catch (ServiceException e) {
+      throw new IOException(e);
     }
   }
 
@@ -54,9 +48,8 @@ public class PicasaPhotoOrganizer implements PhotoOrganizer {
       throws ServiceException {
     MediaId mId = new MediaId();
     mId.setId(photoEntry.getGphotoId());
-    mId.setSource(SOURCE);
-    mId.setAccount(id);
-    
+    mId.setSourceId(sourceId);
+
     Media m = new Media();
     m.setMediaId(mId);
 

@@ -14,7 +14,6 @@ public class Media extends JsonObject implements Comparable<Media> {
   private Set<Resource> resources;
   private String title;
   private DateTime created;
-  private String exifUniqueId;
   private String mimeType;
   
   @Override
@@ -68,14 +67,6 @@ public class Media extends JsonObject implements Comparable<Media> {
 
   public void setCreated(DateTime created) {
     this.created = created;
-  }
-
-  public String getExifUniqueId() {
-    return exifUniqueId;
-  }
-
-  public void setExifUniqueId(String exifUniqueId) {
-    this.exifUniqueId = exifUniqueId;
   }
 
   public String getMimeType() {

@@ -49,15 +49,7 @@ public class PicasaPhotoOrganizerTest {
     String password = testConfig.get("google.password");
     assertThat(password).isNotNull();
 
-    organizer = new PicasaPhotoOrganizer(username, password);
-  }
-
-  @Test
-  public void testListAllPhotos() throws IOException, ServiceException {
-    PhotosDatabase pdb = new PhotosDatabase(testConfig.get("photodb.file"));
-    organizer.loadPhotoEntries(pdb);
-    
-    pdb.save();
+//    organizer = new PicasaPhotoOrganizer(username, password);
   }
 
 }
