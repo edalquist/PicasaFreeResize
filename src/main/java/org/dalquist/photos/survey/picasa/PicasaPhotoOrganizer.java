@@ -4,7 +4,7 @@ import java.io.IOException;
 
 import org.dalquist.photos.survey.PhotoOrganizer;
 import org.dalquist.photos.survey.PhotosDatabase;
-import org.dalquist.photos.survey.model.Media;
+import org.dalquist.photos.survey.model.Image;
 import org.dalquist.photos.survey.model.MediaId;
 import org.dalquist.photos.survey.model.Source;
 import org.dalquist.photos.survey.model.SourceId;
@@ -35,8 +35,8 @@ public class PicasaPhotoOrganizer implements PhotoOrganizer {
         String albumId = albumEntry.getGphotoId();
         String albumTitle = albumEntry.getTitle().getPlainText();
         for (PhotoEntry photoEntry : this.picasaService.getPhotos(albumEntry)) {
-          Media np = convert(photoEntry, albumId, albumTitle);
-          pdb.add(np);
+          Image np = convert(photoEntry, albumId, albumTitle);
+          pdb.writeImage(np);
         }
       }
     } catch (ServiceException e) {
@@ -44,13 +44,13 @@ public class PicasaPhotoOrganizer implements PhotoOrganizer {
     }
   }
 
-  Media convert(PhotoEntry photoEntry, String albumId, String albumTitle)
+  Image convert(PhotoEntry photoEntry, String albumId, String albumTitle)
       throws ServiceException {
     MediaId mId = new MediaId();
     mId.setId(photoEntry.getGphotoId());
     mId.setSourceId(sourceId);
 
-    Media m = new Media();
+    Image m = new Image();
     m.setMediaId(mId);
 
 //    Album album = new Album();

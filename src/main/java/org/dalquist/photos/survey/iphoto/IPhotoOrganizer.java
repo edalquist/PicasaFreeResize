@@ -8,15 +8,15 @@ import java.text.ParseException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.dalquist.photos.survey.PhotoOrganizer;
 import org.dalquist.photos.survey.PhotosDatabase;
 import org.dalquist.photos.survey.model.Album;
-import org.dalquist.photos.survey.model.Media;
+import org.dalquist.photos.survey.model.Image;
 import org.dalquist.photos.survey.model.MediaId;
+import org.dalquist.photos.survey.model.MediaType;
 import org.dalquist.photos.survey.model.Resource;
 import org.dalquist.photos.survey.model.Source;
 import org.dalquist.photos.survey.model.SourceId;
@@ -51,9 +51,10 @@ public class IPhotoOrganizer implements PhotoOrganizer {
     NSDictionary imagesDict = (NSDictionary) rootDict.get("Master Image List");
 
     // Convert each image to a Media
-    Map<String, Media> mediaMap = new HashMap<>();
+    Map<String, Image> mediaMap = new HashMap<>();
     for (final Entry<String, NSObject> mediaEntry : imagesDict.entrySet()) {
-      Media media = transformEntry(mediaEntry.getKey(), mediaEntry.getValue());
+      Image media = transformEntry(mediaEntry.getKey(), mediaEntry.getValue());
+      pdb.writeImage(media);
       mediaMap.put(media.getMediaId().getId(), media);
     }
 
@@ -73,11 +74,11 @@ public class IPhotoOrganizer implements PhotoOrganizer {
 
       NSArray imageKeys = (NSArray) nsAlbum.get("KeyList");
       for (NSObject imageKey : imageKeys.getArray()) {
-        Media me = mediaMap.get(nsToString(imageKey));
+        Image me = mediaMap.get(nsToString(imageKey));
         if (me == null) {
           throw new IllegalStateException("No image found for: " + imageKey);
         }
-        me.getAlbums().add(album);
+//        pdb.putMediaInAlbum(sourceId, album, me);
       }
 
       pdb.writeAlbum(sourceId, album);
@@ -93,18 +94,14 @@ public class IPhotoOrganizer implements PhotoOrganizer {
 
       NSArray imageKeys = (NSArray) roll.get("KeyList");
       for (NSObject imageKey : imageKeys.getArray()) {
-        Media me = mediaMap.get(nsToString(imageKey));
+        Image me = mediaMap.get(nsToString(imageKey));
         if (me == null) {
           throw new IllegalStateException("No image found for: " + imageKey);
         }
-        me.getAlbums().add(album);
+//        pdb.putImageInAlbum(sourceId, album, me);
 
         pdb.writeAlbum(sourceId, album);
       }
-    }
-
-    for (Media entry : mediaMap.values()) {
-      pdb.add(entry);
     }
   }
 
@@ -120,49 +117,36 @@ public class IPhotoOrganizer implements PhotoOrganizer {
     return obj == null ? null : type.cast(obj.toJavaObject());
   }
 
-  public Media transformEntry(String key, NSObject value) {
+  public Image transformEntry(String key, NSObject value) {
     NSDictionary imageDict = (NSDictionary) value;
 
     MediaId mId = new MediaId();
     mId.setId(key); // GUID?
     mId.setSourceId(sourceId);
 
-    Media m = new Media();
+    Image m = new Image();
     m.setMediaId(mId);
 
-    // TODO read file data from FS
-    // np.setCreated(new DateTime(photoEntry.getTimestamp()));
+    MediaType mediaType =
+        "Image".equals(nsToString(imageDict.get("MediaType"))) ? MediaType.IMAGE : MediaType.VIDEO;
 
-    // ExifTags exifTags = photoEntry.getExifTags();
-    // if (exifTags != null) {
-    // np.setExifUniqueId(exifTags.getImageUniqueID());
-    // }
-    // np.setPhash(phash); TODO calculate this via IM
-
-    // TODO convert to mimeType
-    m.setMimeType(nsToString(imageDict.get("MediaType")));
-
-    Set<Resource> resources = m.getResources();
     Resource thumb = createImageResource(nsToString(imageDict.get("ThumbPath")));
     if (thumb != null) {
-      thumb.setDescription("Thumb");
-      resources.add(thumb);
+      m.setThumb(thumb);
     }
 
-    if ("Image".equals(m.getMimeType())) {
+    if (mediaType == MediaType.IMAGE) {
       Resource original = createImageResource(nsToString(imageDict.get("OriginalPath")));
       Resource image = createImageResource(nsToString(imageDict.get("ImagePath")));
-      image.setDescription("Image");
       if (original != null) {
-        original.setPrimary(true);
-        original.setDescription("Original");
-        resources.add(original);
+        // If original exists image must be a modified version
+        m.setOriginal(original);
+        m.setModified(image);
       } else {
-        image.setPrimary(true);
+        m.setOriginal(image);
       }
-      resources.add(image);
     } else {
-      System.err.println("Unhandled MediaType: " + m.getMimeType());
+      System.err.println("Unhandled MediaType: " + mediaType);
       // Assume video?
     }
 
@@ -174,64 +158,7 @@ public class IPhotoOrganizer implements PhotoOrganizer {
       return null;
     }
     Resource resource = new Resource();
-    resource.setUrl(file);
-
-//    FileType fileType;
-//    CountingInputStream countingStream;
-//    HashingInputStream hashingStream;
-//    Metadata metadata;
-//    try (FileInputStream fis = new FileInputStream(file)) {
-//      BufferedInputStream bis = new BufferedInputStream(fis);
-//      fileType = FileTypeDetector.detectFileType(bis);
-//
-//      countingStream = new CountingInputStream(bis);
-//      hashingStream = new HashingInputStream(Hashing.sha1(), countingStream);
-//      metadata = ImageMetadataReader.readMetadata(hashingStream);
-//
-//      // Read the whole stream to ensure the count and hash data is correct
-//      ByteStreams.copy(hashingStream, ByteStreams.nullOutputStream());
-//    } catch (ImageProcessingException | IOException e) {
-//      throw new RuntimeException("Failed to read: " + file, e);
-//    }
-//
-//    // TODO figure out how to capture this in JSON
-//    // for (Directory directory : metadata.getDirectories()) {
-//    // for (Tag tag : directory.getTags()) {
-//    // System.out.println(tag);
-//    // }
-//    // }
-//
-//    // ExifSubIFDDirectory directory = metadata.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
-//    // Date date = directory.getDate(ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL);
-//    try {
-//      // TODO do I need to capture this or just capture all metadata?
-//      switch (fileType) {
-//        case Jpeg: {
-//          JpegDirectory jpegDirectory = metadata.getFirstDirectoryOfType(JpegDirectory.class);
-//          resource.setWidth(jpegDirectory.getInt(JpegDirectory.TAG_IMAGE_WIDTH));
-//          resource.setHeight(jpegDirectory.getInt(JpegDirectory.TAG_IMAGE_HEIGHT));
-//          break;
-//        }
-//
-//        case Png: {
-//          PngDirectory pngDirectory = metadata.getFirstDirectoryOfType(PngDirectory.class);
-//          resource.setWidth(pngDirectory.getInt(PngDirectory.TAG_IMAGE_WIDTH));
-//          resource.setHeight(pngDirectory.getInt(PngDirectory.TAG_IMAGE_HEIGHT));
-//          break;
-//        }
-//
-//        default:
-//          System.err.println("Unhandled FileType: " + fileType);
-//          break;
-//      }
-//    } catch (Exception e) {
-//      throw new RuntimeException("Failed to read: " + file, e);
-//    }
-//
-//    resource.setBytes(countingStream.getByteCount());
-//    // resource.setHeight(0);
-//    // resource.setWidth(0);
-//    resource.setSha(BaseEncoding.base64Url().encode(hashingStream.hash().asBytes()));
+    resource.setUrl("file:" + file);
     return resource;
   }
 }

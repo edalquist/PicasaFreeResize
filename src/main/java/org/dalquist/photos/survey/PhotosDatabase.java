@@ -1,5 +1,7 @@
 package org.dalquist.photos.survey;
 
+import java.util.Map;
+
 import javax.annotation.PreDestroy;
 
 import org.dalquist.photos.survey.firebase.BlockingAuthResultHandler;
@@ -7,7 +9,7 @@ import org.dalquist.photos.survey.firebase.OverallCompletionListener;
 import org.dalquist.photos.survey.model.Album;
 import org.dalquist.photos.survey.model.Config;
 import org.dalquist.photos.survey.model.Credentials;
-import org.dalquist.photos.survey.model.Media;
+import org.dalquist.photos.survey.model.Image;
 import org.dalquist.photos.survey.model.SourceId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -35,93 +37,42 @@ public final class PhotosDatabase {
 
   @PreDestroy
   public void stop() {
+    System.out.println("Waiting for Firebase writes to flush");
     overallCompletionListener.waitForCompletion();
   }
 
   public void writeAlbum(SourceId sourceId, Album album) {
+    Map<String, Object> albumData = ImmutableMap.of("name", album.getName());
+
     firebase
-        .child("sources")
-        .child(sourceId.getId())
-        .child("albums")
-        .child(album.getId())
-        .setValue(ImmutableMap.of("name", album.getName()),
-            overallCompletionListener.getCompletionListener());
+      .child("sources")
+      .child(sourceId.getId())
+      .child("albums")
+      .child(album.getId())
+      .setValue(albumData, overallCompletionListener.getCompletionListener());
   }
 
-  public void add(Media entry) {
-//    media.setValue(entry, new Firebase.CompletionListener() {
-//      @Override
-//      public void onComplete(FirebaseError arg0, Firebase arg1) {
-//        System.out.println("DONE:" + arg0);
-//      }
-//    });
+  public void writeImage(Image image) {
+    ImmutableMap.Builder<String, Object> mediaDataBuilder = ImmutableMap.builder();
+    if (image.getOriginal() != null) {
+      mediaDataBuilder.put("original", image.getOriginal());
+    }
+    if (image.getModified() != null) {
+      mediaDataBuilder.put("modified", image.getModified());
+    }
+    if (image.getThumb() != null) {
+      mediaDataBuilder.put("thumb", image.getThumb());
+    }
+
+    firebase
+      .child("sources")
+      .child(image.getMediaId().getSourceId().getId())
+      .child("images")
+      .child(image.getMediaId().getId())
+      .setValue(mediaDataBuilder.build(), overallCompletionListener.getCompletionListener());
   }
-
-
-  // private final JacksonUtils jacksonUtils;
-  //
-  // private final SortedMap<MediaId, Media> media = new TreeMap<>();
-  //
-  // public PhotosDatabase(String filename) throws IOException {
-  // dbFile = new File(filename);
-  // load();
-  // }
-  //
-  // public void add(Media entry) {
-  // // Perform replacement of existing entries
-  // media.put(entry.getMediaId(), entry);
-  // }
-  //
-  // public void load() throws IOException {
-  // if (!dbFile.exists()) {
-  // return;
-  // }
-  // // TODO
-  // // try (Reader in = new FileReader(dbFile)) {
-  // // ObjectMapper objectMapper = JacksonUtils.getObjectMapper();
-  // //
-  // // MappingIterator<Media> mediaEntryItr =
-  // // objectMapper.reader(Media.class).readValues(in);
-  // //
-  // // List<Media> photosBuilder = new LinkedList<>();
-  // // Iterators.addAll(photosBuilder, mediaEntryItr);
-  // // photos = new TreeSet<>(photosBuilder);
-  // //
-  // // int dupeCount = photosBuilder.size() - photos.size();
-  // // if (dupeCount > 0) {
-  // // throw new IllegalStateException("The photosDb file contains duplicate " + dupeCount +
-  // "entries!");
-  // // }
-  // //
-  // // System.out.println("Loaded " + photos.size() + " photos");
-  // // }
-  // }
-  //
-  // public void save() throws IOException {
-  // Database db = new Database();
-  // db.media = media.values();
-  //
-  // File tempFile = File.createTempFile("pdb_", "_tmp.json");
-  // tempFile.deleteOnExit();
-  // try {
-  // try (Writer out = new FileWriter(tempFile)) {
-  // OBJECT_MAPPER.writer().writeValue(out, db);
-  // }
-  // Files.move(tempFile, dbFile);
-  // } finally {
-  // tempFile.delete();
-  // }
-  // }
-  //
-  // static class Database {
-  // private Collection<Media> media;
-  //
-  // public Collection<Media> getMedia() {
-  // return media;
-  // }
-  //
-  // public void setMedia(Collection<Media> media) {
-  // this.media = media;
-  // }
-  // }
+  
+  public void putImageInAlbum(Image image, Album album) {
+    // TODO
+  }
 }
