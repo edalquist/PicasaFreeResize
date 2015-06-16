@@ -1,6 +1,8 @@
-package org.dalquist.photos.survey.model;
+package org.dalquist.photos.survey.config;
 
 import java.util.List;
+
+import org.dalquist.photos.survey.model.JsonObject;
 
 public class Config extends JsonObject {
   private String photoDbFile;

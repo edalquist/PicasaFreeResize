@@ -9,12 +9,15 @@ import java.util.concurrent.ThreadPoolExecutor;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CPUUsageCollector implements Runnable {
   private final static long INTERVAL = 1000L; // polling interval in ms
 
+  protected final Logger logger = LoggerFactory.getLogger(getClass());
   private final int cores = Runtime.getRuntime().availableProcessors();
   private final List<ThreadPoolExecutor> tpes = new CopyOnWriteArrayList<ThreadPoolExecutor>();
   private final ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
@@ -22,6 +25,7 @@ public class CPUUsageCollector implements Runnable {
 
   private long totalCpuTime = 0L; // total CPU time in millis
   private double load = 0d; // average load over the interval
+  private int previousCores = cores;
 
   @PostConstruct
   public void init() {
@@ -52,20 +56,22 @@ public class CPUUsageCollector implements Runnable {
             time += l;
         }
         long newCpuTime = time / 1000000L;
-        synchronized (this) {
-          long oldCpuTime = totalCpuTime;
-          totalCpuTime = newCpuTime;
-          // load = CPU time difference / sum of elapsed time for all CPUs
-          load =
-              (newCpuTime - oldCpuTime)
-                  / (double) (INTERVAL * Runtime.getRuntime().availableProcessors());
-        }
+        long oldCpuTime = totalCpuTime;
+        totalCpuTime = newCpuTime;
+        // load = CPU time difference / sum of elapsed time for all CPUs
+        load =
+            (newCpuTime - oldCpuTime)
+                / (double) (INTERVAL * Runtime.getRuntime().availableProcessors());
 
         int adjustedCores = (int) (cores * 2 * (1 - load));
-//        System.out.println("Adjusting cores to: " + adjustedCores);
-        for (ThreadPoolExecutor tpe : tpes) {
-          tpe.setCorePoolSize(adjustedCores);
-          tpe.setMaximumPoolSize(adjustedCores);
+        if (adjustedCores != previousCores) {
+          logger.debug("Adjusting cores from {} to {}", previousCores, adjustedCores);
+          previousCores = adjustedCores;
+
+          for (ThreadPoolExecutor tpe : tpes) {
+            tpe.setCorePoolSize(adjustedCores);
+            tpe.setMaximumPoolSize(adjustedCores);
+          }
         }
 
         long sleepTime = INTERVAL - (System.currentTimeMillis() - start);
@@ -76,7 +82,7 @@ public class CPUUsageCollector implements Runnable {
     }
   }
 
-  private synchronized void goToSleep(final long time) {
+  private void goToSleep(final long time) {
     try {
       Thread.sleep(time);
     } catch (InterruptedException e) {

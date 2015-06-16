@@ -1,4 +1,6 @@
-package org.dalquist.photos.survey.model;
+package org.dalquist.photos.survey.config;
+
+import org.dalquist.photos.survey.model.JsonObject;
 
 
 public class Credentials extends JsonObject {

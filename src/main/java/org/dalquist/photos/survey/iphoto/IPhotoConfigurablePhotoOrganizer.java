@@ -2,7 +2,7 @@ package org.dalquist.photos.survey.iphoto;
 
 import org.dalquist.photos.survey.ConfigurablePhotoOrganizer;
 import org.dalquist.photos.survey.PhotoOrganizer;
-import org.dalquist.photos.survey.model.Source;
+import org.dalquist.photos.survey.config.Source;
 import org.springframework.stereotype.Service;
 
 @Service

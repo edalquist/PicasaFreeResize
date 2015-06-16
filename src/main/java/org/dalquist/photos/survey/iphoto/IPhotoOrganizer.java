@@ -5,20 +5,18 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.ParseException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.dalquist.photos.survey.PhotoOrganizer;
 import org.dalquist.photos.survey.PhotosDatabase;
+import org.dalquist.photos.survey.config.Source;
 import org.dalquist.photos.survey.model.Album;
 import org.dalquist.photos.survey.model.Image;
-import org.dalquist.photos.survey.model.MediaId;
-import org.dalquist.photos.survey.model.MediaType;
 import org.dalquist.photos.survey.model.Resource;
-import org.dalquist.photos.survey.model.Source;
 import org.dalquist.photos.survey.model.SourceId;
 import org.xml.sax.SAXException;
 
@@ -50,16 +48,18 @@ public class IPhotoOrganizer implements PhotoOrganizer {
 
     NSDictionary imagesDict = (NSDictionary) rootDict.get("Master Image List");
 
-    // Convert each image to a Media
-    Map<String, Image> mediaMap = new HashMap<>();
+    Map<String, Image> imageMap = new TreeMap<>();
+
+    // Convert each image
     for (final Entry<String, NSObject> mediaEntry : imagesDict.entrySet()) {
       Image media = transformEntry(mediaEntry.getKey(), mediaEntry.getValue());
-      pdb.writeImage(media);
-      mediaMap.put(media.getMediaId().getId(), media);
+      if (media != null) {
+        imageMap.put(media.getId(), media);
+      }
     }
 
-    NSArray albums = (NSArray) rootDict.get("List of Albums");
-    for (NSObject albumObj : albums.getArray()) {
+    NSArray albumsArray = (NSArray) rootDict.get("List of Albums");
+    for (NSObject albumObj : albumsArray.getArray()) {
       NSDictionary nsAlbum = (NSDictionary) albumObj;
 
       String albumType = nsAlbum.get("Album Type").toString();
@@ -74,18 +74,19 @@ public class IPhotoOrganizer implements PhotoOrganizer {
 
       NSArray imageKeys = (NSArray) nsAlbum.get("KeyList");
       for (NSObject imageKey : imageKeys.getArray()) {
-        Image me = mediaMap.get(nsToString(imageKey));
-        if (me == null) {
-          throw new IllegalStateException("No image found for: " + imageKey);
+        Image img = imageMap.get(nsToString(imageKey));
+        if (img == null) {
+          continue;
+//          throw new IllegalStateException("No image found for: " + imageKey);
         }
-//        pdb.putMediaInAlbum(sourceId, album, me);
+        img.addAlbum(album);
+        album.addImage(img);
       }
-
       pdb.writeAlbum(sourceId, album);
     }
 
-    NSArray rolls = (NSArray) rootDict.get("List of Rolls");
-    for (NSObject rollObj : rolls.getArray()) {
+    NSArray rollsArray = (NSArray) rootDict.get("List of Rolls");
+    for (NSObject rollObj : rollsArray.getArray()) {
       NSDictionary roll = (NSDictionary) rollObj;
 
       Album album = new Album();
@@ -94,15 +95,18 @@ public class IPhotoOrganizer implements PhotoOrganizer {
 
       NSArray imageKeys = (NSArray) roll.get("KeyList");
       for (NSObject imageKey : imageKeys.getArray()) {
-        Image me = mediaMap.get(nsToString(imageKey));
-        if (me == null) {
-          throw new IllegalStateException("No image found for: " + imageKey);
+        Image img = imageMap.get(nsToString(imageKey));
+        if (img == null) {
+          continue;
+//          throw new IllegalStateException("No image found for: " + imageKey);
         }
-//        pdb.putImageInAlbum(sourceId, album, me);
-
-        pdb.writeAlbum(sourceId, album);
+        img.addAlbum(album);
+        album.addImage(img);
       }
+      pdb.writeAlbum(sourceId, album);
     }
+
+    pdb.writeImages(sourceId, imageMap.values());
   }
 
   private static Integer nsToInt(NSObject obj) {
@@ -120,22 +124,17 @@ public class IPhotoOrganizer implements PhotoOrganizer {
   public Image transformEntry(String key, NSObject value) {
     NSDictionary imageDict = (NSDictionary) value;
 
-    MediaId mId = new MediaId();
-    mId.setId(key); // GUID?
-    mId.setSourceId(sourceId);
-
     Image m = new Image();
-    m.setMediaId(mId);
+    m.setId(key); // GUID?
 
-    MediaType mediaType =
-        "Image".equals(nsToString(imageDict.get("MediaType"))) ? MediaType.IMAGE : MediaType.VIDEO;
+    boolean isImage = "Image".equals(nsToString(imageDict.get("MediaType")));
 
     Resource thumb = createImageResource(nsToString(imageDict.get("ThumbPath")));
     if (thumb != null) {
       m.setThumb(thumb);
     }
 
-    if (mediaType == MediaType.IMAGE) {
+    if (isImage) {
       Resource original = createImageResource(nsToString(imageDict.get("OriginalPath")));
       Resource image = createImageResource(nsToString(imageDict.get("ImagePath")));
       if (original != null) {
@@ -146,8 +145,9 @@ public class IPhotoOrganizer implements PhotoOrganizer {
         m.setOriginal(image);
       }
     } else {
-      System.err.println("Unhandled MediaType: " + mediaType);
+      // TODO videos too
       // Assume video?
+      return null;
     }
 
     return m;

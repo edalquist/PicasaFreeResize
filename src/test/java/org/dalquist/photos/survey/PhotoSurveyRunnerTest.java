@@ -2,8 +2,8 @@ package org.dalquist.photos.survey;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import org.dalquist.photos.survey.model.Config;
-import org.dalquist.photos.survey.model.Source;
+import org.dalquist.photos.survey.config.Config;
+import org.dalquist.photos.survey.config.Source;
 import org.junit.Ignore;
 import org.junit.Test;
 

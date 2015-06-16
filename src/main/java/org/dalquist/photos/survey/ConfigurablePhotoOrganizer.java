@@ -1,6 +1,6 @@
 package org.dalquist.photos.survey;
 
-import org.dalquist.photos.survey.model.Source;
+import org.dalquist.photos.survey.config.Source;
 
 
 public interface ConfigurablePhotoOrganizer {

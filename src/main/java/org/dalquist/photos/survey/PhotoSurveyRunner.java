@@ -3,8 +3,10 @@ package org.dalquist.photos.survey;
 import java.io.IOException;
 import java.util.Set;
 
-import org.dalquist.photos.survey.model.Config;
-import org.dalquist.photos.survey.model.Source;
+import org.dalquist.photos.survey.config.Config;
+import org.dalquist.photos.survey.config.Source;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -15,13 +17,20 @@ import com.google.gdata.util.ServiceException;
 
 @Service
 public class PhotoSurveyRunner {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PhotoSurveyRunner.class);
+
   public static void main(String[] args) throws Exception {
     try (ConfigurableApplicationContext ctx =
         new AnnotationConfigApplicationContext(AppConfig.class)) {
-      PhotoSurveyRunner runner = ctx.getBean(PhotoSurveyRunner.class);
-      runner.run();
+      try {
+        PhotoSurveyRunner runner = ctx.getBean(PhotoSurveyRunner.class);
+        runner.run();
+      } catch (Throwable t) {
+        LOGGER.error("Something Broke", t);
+        throw t;
+      }
     } finally {
-      System.out.println("DONE");
+      LOGGER.info("All Done!");
     }
   }
 
@@ -38,23 +47,20 @@ public class PhotoSurveyRunner {
   }
 
   private void run() throws JsonProcessingException, IOException, ServiceException {
-//    // Load the photoDb
-//    String photoDbFile = config.getPhotoDbFile();
-
     // Iterate through sources
     for (Source source : config.getSources()) {
       if (new Boolean(source.get("skip"))) {
-        System.out.println("Skipping source: " + source.getId() + ":" + source.getType());
+        LOGGER.info("Skipping source: " + source.getId() + ":" + source.getType());
         continue;
       }
 
       PhotoOrganizer sourceOrganizer = createOrganizer(source);
-      System.out.println("Parsing photos from: " + source.getId() + ":" + source.getType());
+      LOGGER.info("Parsing photos from: " + source.getId() + ":" + source.getType());
 
       sourceOrganizer.loadPhotoEntries(photosDatabase);
 
       // Save the db after each source
-      System.out.println("Parsed photos from: " + source.getId() + ":" + source.getType());
+      LOGGER.info("Parsed photos from: " + source.getId() + ":" + source.getType());
     }
   }
 

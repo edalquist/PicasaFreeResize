@@ -5,13 +5,13 @@ import org.dalquist.photos.survey.ObjectMapperHolder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class JsonObject {
+public abstract class JsonObject {
   private static final ObjectMapper OBJECT_MAPPER = ObjectMapperHolder.getObjectMapper();
 
   protected final JsonNode getJson() {
     return OBJECT_MAPPER.convertValue(this, JsonNode.class);
   }
-  
+
   @Override
   public final int hashCode() {
     return getJson().hashCode();

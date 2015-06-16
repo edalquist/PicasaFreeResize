@@ -5,7 +5,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.dalquist.photos.survey.model.Config;
+import org.dalquist.photos.survey.config.Config;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -17,11 +19,12 @@ import com.google.common.util.concurrent.MoreExecutors;
 @Configuration
 @ComponentScan("org.dalquist.photos.survey")
 public class AppConfig {
+  protected final Logger logger = LoggerFactory.getLogger(getClass());
 
   @Bean
   public ListeningExecutorService createListeningExecutorService(CPUUsageCollector cpuUsageCollector) {
     int cores = Runtime.getRuntime().availableProcessors();
-    System.out.println("Starting with " + cores + " cores");
+    logger.info("Starting with {} cores", cores);
 
     ThreadPoolExecutor tpe =
         new ThreadPoolExecutor(cores, cores, 60, TimeUnit.SECONDS,
