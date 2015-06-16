@@ -7,7 +7,7 @@ import javax.annotation.PreDestroy;
 import org.dalquist.photos.survey.config.Config;
 import org.dalquist.photos.survey.config.Credentials;
 import org.dalquist.photos.survey.firebase.BlockingAuthResultHandler;
-import org.dalquist.photos.survey.firebase.OverallCompletionListener;
+import org.dalquist.photos.survey.firebase.WriteManager;
 import org.dalquist.photos.survey.firebase.SystemOutLogger;
 import org.dalquist.photos.survey.model.Album;
 import org.dalquist.photos.survey.model.Image;
@@ -25,8 +25,8 @@ import com.firebase.client.Logger.Level;
 @Service
 public final class PhotosDatabase {
   private final Logger logger = LoggerFactory.getLogger(getClass());
-  private final OverallCompletionListener overallCompletionListener =
-      new OverallCompletionListener();
+  private final WriteManager overallCompletionListener =
+      new WriteManager();
   private final Firebase firebase;
 
   @Autowired
