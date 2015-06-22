@@ -2,19 +2,19 @@ package org.dalquist.photos.survey.model;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Ordering;
 
-public class Image extends FirebaseObject implements Comparable<Image> {
+public class Image extends PersistedObject implements Comparable<Image> {
   private String id;
   private Resource original;
   private Resource modified;
   private Resource thumb;
-  private SortedMap<String, Boolean> albums = new TreeMap<>();
+  private SortedSet<String> albums = new TreeSet<>();
 
   @Override
   public int compareTo(Image o) {
@@ -24,16 +24,16 @@ public class Image extends FirebaseObject implements Comparable<Image> {
   }
 
   @Override
-  public Map<String, Object> getFirebaseRepresentation() {
+  public Map<String, Object> getCollectionRepresentation() {
     ImmutableMap.Builder<String, Object> mediaDataBuilder = ImmutableMap.builder();
     if (original != null) {
-      mediaDataBuilder.put("original", original.getFirebaseRepresentation());
+      mediaDataBuilder.put("original", original.getCollectionRepresentation());
     }
     if (modified != null) {
-      mediaDataBuilder.put("modified", modified.getFirebaseRepresentation());
+      mediaDataBuilder.put("modified", modified.getCollectionRepresentation());
     }
     if (modified != null) {
-      mediaDataBuilder.put("thumb", modified.getFirebaseRepresentation());
+      mediaDataBuilder.put("thumb", modified.getCollectionRepresentation());
     }
     mediaDataBuilder.put("albums", albums);
 
@@ -73,10 +73,10 @@ public class Image extends FirebaseObject implements Comparable<Image> {
   }
 
   public Set<String> getAlbumIds() {
-    return albums.keySet();
+    return albums;
   }
 
   public void addAlbum(Album album) {
-    albums.put(album.getId(), Boolean.TRUE);
+    albums.add(album.getId());
   }
 }

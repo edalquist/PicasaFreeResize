@@ -2,17 +2,17 @@ package org.dalquist.photos.survey.model;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Ordering;
 
-public class Album extends FirebaseObject implements Comparable<Album> {
+public class Album extends PersistedObject implements Comparable<Album> {
   private String id;
   private String name;
-  private SortedMap<String, Boolean> images = new TreeMap<>();
+  private SortedSet<String> images = new TreeSet<>();
 
   @Override
   public int compareTo(Album o) {
@@ -23,7 +23,7 @@ public class Album extends FirebaseObject implements Comparable<Album> {
   }
 
   @Override
-  public Map<String, Object> getFirebaseRepresentation() {
+  public Map<String, Object> getCollectionRepresentation() {
     ImmutableMap.Builder<String, Object> mediaDataBuilder = ImmutableMap.builder();
     mediaDataBuilder.put("name", name);
     mediaDataBuilder.put("images", images);
@@ -48,10 +48,10 @@ public class Album extends FirebaseObject implements Comparable<Album> {
   }
 
   public void addImage(Image image) {
-    images.put(image.getId(), Boolean.TRUE);
+    images.add(image.getId());
   }
 
   public Set<String> getImageIds() {
-    return images.keySet();
+    return images;
   }
 }

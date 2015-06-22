@@ -7,7 +7,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Ordering;
 
 
-public class Resource extends FirebaseObject implements Comparable<Resource> {
+public class Resource extends PersistedObject implements Comparable<Resource> {
   private String url;
 
   @Override
@@ -18,7 +18,7 @@ public class Resource extends FirebaseObject implements Comparable<Resource> {
   }
 
   @Override
-  public Map<String, Object> getFirebaseRepresentation() {
+  public Map<String, Object> getCollectionRepresentation() {
     return ImmutableMap.of("url", url);
   }
 

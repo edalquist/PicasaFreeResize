@@ -33,7 +33,7 @@ public class IPhotoOrganizer implements PhotoOrganizer {
 
   public IPhotoOrganizer(Source config) {
     this.sourceId = config.getSourceId();
-    this.albumXml = Preconditions.checkNotNull(config.get("album.xml"));
+    this.albumXml = Preconditions.checkNotNull((String) config.get("album.xml"));
   }
 
   @Override

@@ -4,7 +4,7 @@ import java.util.HashMap;
 
 import org.dalquist.photos.survey.model.SourceId;
 
-public class Source extends HashMap<String, String> {
+public class Source extends HashMap<String, Object> {
   private static final long serialVersionUID = 1L;
 
   public SourceId getSourceId() {
@@ -12,7 +12,7 @@ public class Source extends HashMap<String, String> {
   }
 
   public String getId() {
-    return get("id");
+    return (String) get("id");
   }
 
   public void setId(String id) {
@@ -20,10 +20,18 @@ public class Source extends HashMap<String, String> {
   }
 
   public String getType() {
-    return get("type");
+    return (String) get("type");
   }
 
   public void setType(String type) {
     put("type", type);
+  }
+  
+  public PathReplacement getPathReplacement() {
+    return (PathReplacement) get("pathReplacement");
+  }
+  
+  public void setPathReplacement(PathReplacement pathReplacement) {
+    put("pathReplacement", pathReplacement);
   }
 }

@@ -49,7 +49,7 @@ public class PhotoSurveyRunner {
   private void run() throws JsonProcessingException, IOException, ServiceException {
     // Iterate through sources
     for (Source source : config.getSources()) {
-      if (new Boolean(source.get("skip"))) {
+      if (new Boolean(String.valueOf(source.get("skip")))) {
         LOGGER.info("Skipping source: " + source.getId() + ":" + source.getType());
         continue;
       }

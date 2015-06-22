@@ -1,93 +1,80 @@
 package org.dalquist.photos.survey;
 
+import java.io.File;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.PreDestroy;
 
 import org.dalquist.photos.survey.config.Config;
-import org.dalquist.photos.survey.config.Credentials;
-import org.dalquist.photos.survey.firebase.BlockingAuthResultHandler;
-import org.dalquist.photos.survey.firebase.WriteManager;
-import org.dalquist.photos.survey.firebase.SystemOutLogger;
 import org.dalquist.photos.survey.model.Album;
 import org.dalquist.photos.survey.model.Image;
 import org.dalquist.photos.survey.model.SourceId;
+import org.mapdb.DB;
+import org.mapdb.DBMaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.firebase.client.Firebase;
-import com.firebase.client.Firebase.CompletionListener;
-import com.firebase.client.FirebaseError;
-import com.firebase.client.Logger.Level;
-
 @Service
 public final class PhotosDatabase {
   private final Logger logger = LoggerFactory.getLogger(getClass());
-  private final WriteManager overallCompletionListener =
-      new WriteManager();
-  private final Firebase firebase;
+  private final DB db;
+  private final Map<String, Object> dbMap;
+  private final AtomicInteger commitCounter = new AtomicInteger();
 
   @Autowired
   public PhotosDatabase(Config config) {
-    com.firebase.client.Config fbConfig = new com.firebase.client.Config();
-    fbConfig.setLogLevel(Level.DEBUG);
-    fbConfig.setLogger(SystemOutLogger.INSTANCE);
-
-    Firebase.setDefaultConfig(fbConfig);
-    firebase = new Firebase("https://photosdb.firebaseio.com/");
-    Credentials firebaseCredentials = config.getFirebaseCredentials();
-
-    // Request auth and wait for it to complete
-    BlockingAuthResultHandler waitingAuthResultHandler = new BlockingAuthResultHandler();
-    firebase.authWithPassword(firebaseCredentials.getEmail(), firebaseCredentials.getPassword(),
-        waitingAuthResultHandler);
-    waitingAuthResultHandler.waitForAuth();
+    db = DBMaker.newFileDB(new File(config.getPhotoDbFile()))
+        .cacheLRUEnable()
+        .checksumEnable()
+        .asyncWriteEnable()
+        .make();
+    dbMap = db.getHashMap("photos");
   }
 
   @PreDestroy
   public void stop() {
-    logger.info("Waiting for Firebase writes to flush");
-    overallCompletionListener.waitForCompletion();
+    // Ensure commit is complete
+    db.commit();
+
+    logger.info("Compacting DB");
+    try {
+      db.compact();
+    } catch (RuntimeException e) {
+      logger.error("Compact failed", e);
+    }
+    logger.info("Closing DB");
+    try {
+      db.close();
+    } catch (RuntimeException e) {
+      logger.error("Close failed", e);
+    }
+    logger.info("Closed DB");
   }
 
   public void writeImage(SourceId sourceId, Image image) {
-    Firebase path = getImagesRoot(sourceId).child(image.getId());
-    writeObject(path, image.getFirebaseRepresentation());
+    String imageKey = "/sources/" + sourceId.getId() + "/images/" + image.getId();
+    dbMap.put(imageKey, image.getCollectionRepresentation());
+    commit();
   }
 
   public void writeImages(SourceId sourceId, Iterable<Image> images) {
-    Firebase path = getImagesRoot(sourceId);
     for (Image image : images) {
-      Firebase imagePath = path.child(image.getId());
-      writeObject(imagePath, image.getFirebaseRepresentation());
+      writeImage(sourceId, image);
     }
   }
 
   public void writeAlbum(SourceId sourceId, Album album) {
-    Firebase path = getAlbumsRoot(sourceId).child(album.getId());
-    writeObject(path, album.getFirebaseRepresentation());
+    String albumKey = "/sources/" + sourceId.getId() + "/albums/" + album.getId();
+    dbMap.put(albumKey, album.getCollectionRepresentation());
+    commit();
   }
 
-  private void writeObject(Firebase path, Map<String, Object> obj) {
-    CompletionListener completionListener = overallCompletionListener.getCompletionListener();
-    try {
-      path.updateChildren(obj, completionListener);
-    } catch (RuntimeException e) {
-      completionListener.onComplete(FirebaseError.fromException(e), path);
+  private void commit() {
+    if (commitCounter.incrementAndGet() % 1000 == 0) {
+      db.commit();
     }
-  }
-
-  private Firebase getSourceRoot(SourceId sourceId) {
-    return firebase.child("sources").child(sourceId.getId());
-  }
-
-  private Firebase getImagesRoot(SourceId sourceId) {
-    return getSourceRoot(sourceId).child("images");
-  }
-
-  private Firebase getAlbumsRoot(SourceId sourceId) {
-    return getSourceRoot(sourceId).child("albums");
   }
 }

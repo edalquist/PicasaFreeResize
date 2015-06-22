@@ -22,8 +22,8 @@ public class PicasaPhotoOrganizer implements PhotoOrganizer {
   public PicasaPhotoOrganizer(Source config) throws AuthenticationException {
     this.sourceId = config.getSourceId();
 
-    String username = config.get("username");
-    String password = config.get("password");
+    String username = (String) config.get("username");
+    String password = (String) config.get("password");
     this.picasaService = new SimplePicasaServiceImpl(username, password);
   }
 
