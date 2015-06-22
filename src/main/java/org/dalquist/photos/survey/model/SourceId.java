@@ -1,9 +1,14 @@
 package org.dalquist.photos.survey.model;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.Ordering;
 
+@JsonTypeInfo(use = Id.MINIMAL_CLASS)
 public class SourceId extends JsonObject implements Comparable<SourceId> {
+  private static final long serialVersionUID = 1L;
+
   private String type;
   private String id;
 

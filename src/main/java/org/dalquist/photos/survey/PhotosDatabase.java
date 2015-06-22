@@ -1,7 +1,9 @@
 package org.dalquist.photos.survey;
 
 import java.io.File;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.PreDestroy;
@@ -17,11 +19,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.google.gdata.util.common.base.Pair;
+
 @Service
 public final class PhotosDatabase {
   private final Logger logger = LoggerFactory.getLogger(getClass());
   private final DB db;
-  private final Map<String, Object> dbMap;
+  private final Map<Pair<SourceId, String>, Image> imagesMap;
+  private final Map<Pair<SourceId, String>, Album> albumsMap;
   private final AtomicInteger commitCounter = new AtomicInteger();
 
   @Autowired
@@ -31,7 +36,8 @@ public final class PhotosDatabase {
         .checksumEnable()
         .asyncWriteEnable()
         .make();
-    dbMap = db.getHashMap("photos");
+    imagesMap = db.getHashMap("images");
+    albumsMap = db.getHashMap("albums");
   }
 
   @PreDestroy
@@ -55,8 +61,8 @@ public final class PhotosDatabase {
   }
 
   public void writeImage(SourceId sourceId, Image image) {
-    String imageKey = "/sources/" + sourceId.getId() + "/images/" + image.getId();
-    dbMap.put(imageKey, image.getCollectionRepresentation());
+    Pair<SourceId, String> imageKey = getImageKey(sourceId, image);
+    imagesMap.put(imageKey, image);
     commit();
   }
 
@@ -67,10 +73,32 @@ public final class PhotosDatabase {
   }
 
   public void writeAlbum(SourceId sourceId, Album album) {
-    String albumKey = "/sources/" + sourceId.getId() + "/albums/" + album.getId();
-    dbMap.put(albumKey, album.getCollectionRepresentation());
+    Pair<SourceId, String> albumKey = getAlbumKey(sourceId, album);
+    albumsMap.put(albumKey, album);
     commit();
   }
+
+  public Iterator<Entry<Pair<SourceId, String>, Image>> listImages() {
+    return imagesMap.entrySet().iterator();
+  }
+
+  private Pair<SourceId, String> getAlbumKey(SourceId sourceId, Album album) {
+    return Pair.of(sourceId, album.getId());
+//    return toJsonArray("source", sourceId.getId(), "album", album.getId());
+  }
+
+  private Pair<SourceId, String> getImageKey(SourceId sourceId, Image image) {
+    return Pair.of(sourceId, image.getId());
+//    return toJsonArray("source", sourceId.getId(), "image", image.getId());
+  }
+
+//  private String toJsonArray(String... parts) {
+//    try {
+//      return ObjectMapperHolder.getObjectMapper().writeValueAsString(parts);
+//    } catch (JsonProcessingException e) {
+//      throw new RuntimeException(e);
+//    }
+//  }
 
   private void commit() {
     if (commitCounter.incrementAndGet() % 1000 == 0) {

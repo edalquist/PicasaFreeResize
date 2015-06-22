@@ -1,15 +1,15 @@
 package org.dalquist.photos.survey.model;
 
-import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
 import com.google.common.collect.ComparisonChain;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Ordering;
 
-public class Image extends PersistedObject implements Comparable<Image> {
+public class Image extends JsonObject implements Comparable<Image> {
+  private static final long serialVersionUID = 1L;
+
   private String id;
   private Resource original;
   private Resource modified;
@@ -21,23 +21,6 @@ public class Image extends PersistedObject implements Comparable<Image> {
     return ComparisonChain.start()
         .compare(id, o.id, Ordering.natural().nullsLast())
         .result();
-  }
-
-  @Override
-  public Map<String, Object> getCollectionRepresentation() {
-    ImmutableMap.Builder<String, Object> mediaDataBuilder = ImmutableMap.builder();
-    if (original != null) {
-      mediaDataBuilder.put("original", original.getCollectionRepresentation());
-    }
-    if (modified != null) {
-      mediaDataBuilder.put("modified", modified.getCollectionRepresentation());
-    }
-    if (modified != null) {
-      mediaDataBuilder.put("thumb", modified.getCollectionRepresentation());
-    }
-    mediaDataBuilder.put("albums", albums);
-
-    return mediaDataBuilder.build();
   }
 
   public Resource getOriginal() {

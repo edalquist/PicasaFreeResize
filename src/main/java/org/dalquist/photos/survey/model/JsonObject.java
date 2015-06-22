@@ -1,11 +1,15 @@
 package org.dalquist.photos.survey.model;
 
+import java.io.Serializable;
+
 import org.dalquist.photos.survey.ObjectMapperHolder;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public abstract class JsonObject {
+public abstract class JsonObject implements Serializable {
+  private static final long serialVersionUID = 1L;
+
   private static final ObjectMapper OBJECT_MAPPER = ObjectMapperHolder.getObjectMapper();
 
   protected final JsonNode getJson() {
