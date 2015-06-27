@@ -32,6 +32,7 @@ public class AppConfig {
     ListeningExecutorService les = MoreExecutors.listeningDecorator(tpe);
 
     return les;
+//    return MoreExecutors.newDirectExecutorService();
   }
 
   @Bean

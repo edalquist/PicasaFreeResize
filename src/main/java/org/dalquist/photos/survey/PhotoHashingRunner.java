@@ -1,10 +1,9 @@
 package org.dalquist.photos.survey;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -13,6 +12,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.dalquist.photos.survey.config.Config;
@@ -37,6 +37,9 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.gdata.util.common.base.Pair;
+import com.zaxxer.nuprocess.NuAbstractProcessHandler;
+import com.zaxxer.nuprocess.NuProcess;
+import com.zaxxer.nuprocess.NuProcessBuilder;
 
 @Service
 public class PhotoHashingRunner {
@@ -85,9 +88,9 @@ public class PhotoHashingRunner {
 
       // Trigger photo persist once both resources have been processed
       @SuppressWarnings("unchecked")
-      ListenableFuture<List<Boolean>> imageFutures = Futures.allAsList(
-          submit(pathReplacement, image.getOriginal()),
-          submit(pathReplacement, image.getModified()));
+      ListenableFuture<List<Boolean>> imageFutures =
+          Futures.allAsList(submit(pathReplacement, image.getOriginal()),
+              submit(pathReplacement, image.getModified()));
 
       Futures.addCallback(imageFutures, new FutureCallback<List<Boolean>>() {
         @Override
@@ -96,25 +99,23 @@ public class PhotoHashingRunner {
           if (result.contains(true)) {
             write();
           }
-          log();
+          imageCounter.incrementAndGet();
         }
 
         @Override
         public void onFailure(Throwable t) {
           // Be safe and write
           write();
-          log();
+          imageCounter.incrementAndGet();
         }
 
         private void write() {
           photosDatabase.writeImage(sourceId, image);
-        }
 
-        private void log() {
           statusLoggingExecutor.run(new Runnable() {
             @Override
             public void run() {
-              int processedImages = imageCounter.incrementAndGet();
+              int processedImages = imageCounter.get();
               int percent = (processedImages / totalImages) * 100;
               LOGGER.info(percent + "% complete (" + processedImages + "/" + totalImages + ")");
             }
@@ -178,26 +179,44 @@ public class PhotoHashingRunner {
     @Override
     @SuppressWarnings("unchecked")
     public Boolean call() throws Exception {
-      String url = resource.getUrl();
-      if (pathReplacement != null) {
-        url = url.replace(pathReplacement.getFrom(), pathReplacement.getTo());
-      }
-      if (url.startsWith("file:/")) {
-        url = url.substring("file:/".length() - 1);
-      }
+      final String url = getUrl();
 
       LOGGER.info("Start processing: " + url);
 
-      ProcessBuilder pb = new ProcessBuilder(convertBinary, url, "-moments", "json:-");
-      Process proc = pb.start();
+      final StringBuilder stdoutBuilder = new StringBuilder();
+      final StringBuilder stderrBuilder = new StringBuilder();
 
-      StringBuilder stdoutBuilder = new StringBuilder();
-      StringBuilder stderrBuilder = new StringBuilder();
-      readOutputs(proc, stdoutBuilder, stderrBuilder);
+      // ProcessBuilder pb = new ProcessBuilder(convertBinary, url, "-moments", "json:-");
+      // Process proc = pb.start();
+      NuProcessBuilder pb = new NuProcessBuilder(convertBinary, url, "-moments", "json:-");
+      pb.setProcessListener(new NuAbstractProcessHandler() {
+        @Override
+        public void onStdout(ByteBuffer buffer) {
+          if (buffer != null) {
+            CharBuffer charBuffer = StandardCharsets.UTF_8.decode(buffer);
+            stdoutBuilder.append(charBuffer);
+          }
+        }
 
-      if (proc.exitValue() != 0) {
-        throw new RuntimeException("Failed to execute convert on: " + url + "\n" + stderrBuilder);
-      }
+        @Override
+        public void onStderr(ByteBuffer buffer) {
+          if (buffer != null) {
+            CharBuffer charBuffer = StandardCharsets.UTF_8.decode(buffer);
+            stderrBuilder.append(charBuffer);
+          }
+        }
+
+        @Override
+        public void onExit(int exitCode) {
+          if (exitCode != 0) {
+            throw new RuntimeException("Failed to execute convert on: " + url + "\n"
+                + stderrBuilder);
+          }
+        }
+      });
+
+      NuProcess proc = pb.start();
+      proc.waitFor(5, TimeUnit.MINUTES);
 
       ObjectMapper objectMapper = ObjectMapperHolder.getObjectMapper();
       Map<String, Object> metadata = objectMapper.readValue(stdoutBuilder.toString(), Map.class);
@@ -210,35 +229,15 @@ public class PhotoHashingRunner {
       return true;
     }
 
-    private void readOutputs(Process proc, StringBuilder stdoutBuilder, StringBuilder stderrBuilder)
-        throws IOException {
-      char[] readBuff = new char[1024];
-      try (InputStream stdout = proc.getInputStream(); InputStream stderr = proc.getErrorStream();) {
-        Reader stdoutR = new BufferedReader(new InputStreamReader(stdout));
-        Reader stderrR = new BufferedReader(new InputStreamReader(stderr));
-
-        while (proc.isAlive()) {
-          readInto(stdoutR, readBuff, stdoutBuilder);
-          readInto(stderrR, readBuff, stderrBuilder);
-          try {
-            Thread.sleep(1);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
-          }
-        }
-
-        // Read one last time
-        readInto(stdoutR, readBuff, stdoutBuilder);
-        readInto(stderrR, readBuff, stderrBuilder);
+    private String getUrl() {
+      String url = resource.getUrl();
+      if (pathReplacement != null) {
+        url = url.replace(pathReplacement.getFrom(), pathReplacement.getTo());
       }
-    }
-
-    private void readInto(Reader src, char[] readBuff, StringBuilder dest) throws IOException {
-      while (src.ready()) {
-        int chars = src.read(readBuff);
-        dest.append(readBuff, 0, chars);
+      if (url.startsWith("file:/")) {
+        url = url.substring("file:/".length() - 1);
       }
+      return url;
     }
   }
 }
