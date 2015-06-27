@@ -1,7 +1,6 @@
 package org.dalquist.photos.survey;
 
 import java.io.File;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -34,7 +33,7 @@ public final class PhotosDatabase {
     db = DBMaker.newFileDB(new File(config.getPhotoDbFile()))
         .cacheLRUEnable()
         .checksumEnable()
-        .asyncWriteEnable()
+//        .asyncWriteEnable()
         .make();
     imagesMap = db.getHashMap("images");
     albumsMap = db.getHashMap("albums");
@@ -78,8 +77,8 @@ public final class PhotosDatabase {
     commit();
   }
 
-  public Iterator<Entry<Pair<SourceId, String>, Image>> listImages() {
-    return imagesMap.entrySet().iterator();
+  public Iterable<Entry<Pair<SourceId, String>, Image>> listImages() {
+    return imagesMap.entrySet();
   }
 
   private Pair<SourceId, String> getAlbumKey(SourceId sourceId, Album album) {
@@ -101,8 +100,8 @@ public final class PhotosDatabase {
 //  }
 
   private void commit() {
-    if (commitCounter.incrementAndGet() % 1000 == 0) {
+//    if (commitCounter.incrementAndGet() % 1000 == 0) {
       db.commit();
-    }
+//    }
   }
 }

@@ -22,16 +22,14 @@ public class AppConfig {
   protected final Logger logger = LoggerFactory.getLogger(getClass());
 
   @Bean
-  public ListeningExecutorService createListeningExecutorService(CPUUsageCollector cpuUsageCollector) {
+  public ListeningExecutorService createListeningExecutorService() {
     int cores = Runtime.getRuntime().availableProcessors();
     logger.info("Starting with {} cores", cores);
 
     ThreadPoolExecutor tpe =
         new ThreadPoolExecutor(cores, cores, 60, TimeUnit.SECONDS,
-            new LinkedBlockingQueue<Runnable>(), new ThreadPoolExecutor.CallerRunsPolicy());
+            new LinkedBlockingQueue<Runnable>(cores * 4), new ThreadPoolExecutor.CallerRunsPolicy());
     ListeningExecutorService les = MoreExecutors.listeningDecorator(tpe);
-
-    cpuUsageCollector.registerThreadPool(tpe);
 
     return les;
   }
