@@ -2,6 +2,7 @@ package org.dalquist.photos.survey;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Collection;
@@ -67,7 +68,8 @@ public class PhotoHashingRunner {
   }
 
   private void run() throws JsonProcessingException, IOException {
-    Collection<ListenableFuture<?>> futures = new LinkedList<>();
+    Collection<ListenableFuture<List<Boolean>>> futures = new LinkedList<>();
+
     for (Entry<Pair<SourceId, String>, Image> imageEntry : photosDatabase.listImages()) {
       final SourceId sourceId = imageEntry.getKey().first;
       Source source = config.getSource(sourceId);
@@ -75,15 +77,16 @@ public class PhotoHashingRunner {
 
       Image image = imageEntry.getValue();
 
-      ListenableFuture<Boolean> of = submit(pathReplacement, image.getOriginal());
-      ListenableFuture<Boolean> mf = submit(pathReplacement, image.getModified());
-      futures.add(of);
-      futures.add(mf);
-
       // Trigger photo persist once both resources have been processed
-      Futures.addCallback(Futures.allAsList(of, mf), new FutureCallback<List<Boolean>>() {
+      @SuppressWarnings("unchecked")
+      ListenableFuture<List<Boolean>> imageFutures = Futures.allAsList(
+          submit(pathReplacement, image.getOriginal()),
+          submit(pathReplacement, image.getModified()));
+
+      Futures.addCallback(imageFutures, new FutureCallback<List<Boolean>>() {
         @Override
         public void onSuccess(List<Boolean> result) {
+          // If at least one of the tasks modified a resource write the modified image
           if (result.contains(true)) {
             photosDatabase.writeImage(sourceId, image);
           }
@@ -98,8 +101,9 @@ public class PhotoHashingRunner {
 
 
       // Keep the list size down
-      for (Iterator<ListenableFuture<?>> futureItr = futures.iterator(); futureItr.hasNext();) {
-        ListenableFuture<?> future = futureItr.next();
+      for (Iterator<ListenableFuture<List<Boolean>>> futureItr = futures.iterator(); futureItr
+          .hasNext();) {
+        ListenableFuture<List<Boolean>> future = futureItr.next();
         if (future.isDone()) {
           try {
             future.get();
@@ -161,9 +165,7 @@ public class PhotoHashingRunner {
 
       LOGGER.info("Start processing: " + url);
 
-      ProcessBuilder pb =
-          new ProcessBuilder("/Users/edalquist/tmp/im_json_bug/im/bin/convert", url, "-moments",
-              "json:-");
+      ProcessBuilder pb = new ProcessBuilder(convertBinary, url, "-moments", "json:-");
       Process proc = pb.start();
 
       StringBuilder stdoutBuilder = new StringBuilder();
@@ -185,13 +187,16 @@ public class PhotoHashingRunner {
       return true;
     }
 
-    private void readOutputs(Process proc, StringBuilder stdoutBuilder, StringBuilder stderrBuilder) {
+    private void readOutputs(Process proc, StringBuilder stdoutBuilder, StringBuilder stderrBuilder)
+        throws IOException {
       char[] readBuff = new char[1024];
-      try (Reader stdout = new BufferedReader(new InputStreamReader(proc.getInputStream()));
-          Reader stderr = new BufferedReader(new InputStreamReader(proc.getErrorStream()));) {
+      try (InputStream stdout = proc.getInputStream(); InputStream stderr = proc.getErrorStream();) {
+        Reader stdoutR = new BufferedReader(new InputStreamReader(stdout));
+        Reader stderrR = new BufferedReader(new InputStreamReader(stderr));
+
         while (proc.isAlive()) {
-          readInto(stdout, readBuff, stdoutBuilder);
-          readInto(stderr, readBuff, stderrBuilder);
+          readInto(stdoutR, readBuff, stdoutBuilder);
+          readInto(stderrR, readBuff, stderrBuilder);
           try {
             Thread.sleep(1);
           } catch (InterruptedException e) {
@@ -201,10 +206,8 @@ public class PhotoHashingRunner {
         }
 
         // Read one last time
-        readInto(stdout, readBuff, stdoutBuilder);
-        readInto(stderr, readBuff, stderrBuilder);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
+        readInto(stdoutR, readBuff, stdoutBuilder);
+        readInto(stderrR, readBuff, stderrBuilder);
       }
     }
 

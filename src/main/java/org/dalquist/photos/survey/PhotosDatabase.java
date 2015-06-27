@@ -3,7 +3,7 @@ package org.dalquist.photos.survey;
 import java.io.File;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.PreDestroy;
 
@@ -26,7 +26,7 @@ public final class PhotosDatabase {
   private final DB db;
   private final Map<Pair<SourceId, String>, Image> imagesMap;
   private final Map<Pair<SourceId, String>, Album> albumsMap;
-  private final AtomicInteger commitCounter = new AtomicInteger();
+  private final AtomicLong commitTimer = new AtomicLong(System.currentTimeMillis());
 
   @Autowired
   public PhotosDatabase(Config config) {
@@ -100,8 +100,13 @@ public final class PhotosDatabase {
 //  }
 
   private void commit() {
-//    if (commitCounter.incrementAndGet() % 1000 == 0) {
-      db.commit();
-//    }
+    long now = System.currentTimeMillis();
+    long last = commitTimer.get();
+    if ((now - last) > 5000) {
+      if (commitTimer.compareAndSet(last, now)) {
+        logger.info("Commit!");
+        db.commit();
+      }
+    }
   }
 }
