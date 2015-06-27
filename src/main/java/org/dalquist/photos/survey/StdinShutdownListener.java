@@ -13,20 +13,16 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.stereotype.Service;
 
 import com.google.common.io.LineReader;
-import com.google.common.util.concurrent.ListeningExecutorService;
 
 @Service
 public class StdinShutdownListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(PhotoHashingRunner.class);
 
   private final ConfigurableApplicationContext ctx;
-  private final ListeningExecutorService execService;
 
   @Autowired
-  public StdinShutdownListener(ConfigurableApplicationContext ctx,
-      ListeningExecutorService execService) {
+  public StdinShutdownListener(ConfigurableApplicationContext ctx) {
     this.ctx = ctx;
-    this.execService = execService;
   }
 
   @PostConstruct
@@ -59,10 +55,6 @@ public class StdinShutdownListener {
   }
 
   public void shutdown() {
-//    LOGGER.warn("Thread Pool Shutdown");
-//    execService.shutdown();
-//    LOGGER.warn("Sending Stop Event");
-//    ctx.publishEvent(new ShutdownRequested(StdinShutdownListener.this));
     LOGGER.warn("Closing Spring App Context");
     ctx.close();
   }

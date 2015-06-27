@@ -68,7 +68,7 @@ public class PhotoHashingRunner implements ApplicationListener<ShutdownRequested
   private final Config config;
   private final PhotosDatabase photosDatabase;
   private final ListeningExecutorService execService;
-  private final Map<Resource, ListenableFuture<Long>> futures = new ConcurrentHashMap<>();
+  private final Map<String, ListenableFuture<Long>> futures = new ConcurrentHashMap<>();
   private final DescriptiveStatistics procTimeStats = new DescriptiveStatistics(1000000);
   private final DescriptiveStatistics completeTimeStats = new DescriptiveStatistics(1000000);
   private final AtomicLong lastCompleted = new AtomicLong(System.nanoTime());
@@ -186,8 +186,7 @@ public class PhotoHashingRunner implements ApplicationListener<ShutdownRequested
     MetaDataExtractor extractor =
         new MetaDataExtractor(config.getConvertBinary(), pathReplacement, resource);
     ListenableFuture<Long> f = execService.submit(extractor);
-    LOGGER.info("Submitted: " + resource.getUrl());
-    futures.put(resource, f);
+    futures.put(resource.getUrl(), f);
     Futures.addCallback(f, new FutureCallback<Long>() {
       @Override
       public void onSuccess(Long result) {
@@ -202,7 +201,9 @@ public class PhotoHashingRunner implements ApplicationListener<ShutdownRequested
 
       private void onComplete(final DescriptiveStatistics completeTimeStats,
           final AtomicLong lastCompleted) {
-        futures.remove(resource);
+        if (futures.remove(resource.getUrl()) == null) {
+          LOGGER.warn("Nothing removed for: " + resource.getUrl());
+        };
         long prev = lastCompleted.get();
         long now = System.nanoTime();
         long duration = now - prev;
@@ -273,7 +274,9 @@ public class PhotoHashingRunner implements ApplicationListener<ShutdownRequested
       });
 
       NuProcess proc = pb.start();
-      proc.waitFor(5, TimeUnit.MINUTES);
+      while (proc.isRunning()) {
+        proc.waitFor(1, TimeUnit.SECONDS);
+      }
 
       ObjectMapper objectMapper = ObjectMapperHolder.getObjectMapper();
       Map<String, Object> metadata = objectMapper.readValue(stdoutBuilder.toString(), Map.class);
