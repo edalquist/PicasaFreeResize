@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.dalquist.photos.survey.config.Config;
 import org.dalquist.photos.survey.config.PathReplacement;
@@ -20,6 +21,7 @@ import org.dalquist.photos.survey.config.Source;
 import org.dalquist.photos.survey.model.Image;
 import org.dalquist.photos.survey.model.Resource;
 import org.dalquist.photos.survey.model.SourceId;
+import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,6 +60,7 @@ public class PhotoHashingRunner {
   private final Config config;
   private final PhotosDatabase photosDatabase;
   private final ListeningExecutorService execService;
+  private final PeriodicExecutor statusLoggingExecutor = new PeriodicExecutor(Period.seconds(5));
 
   @Autowired
   public PhotoHashingRunner(Config config, PhotosDatabase photosDatabase,
@@ -68,6 +71,9 @@ public class PhotoHashingRunner {
   }
 
   private void run() throws JsonProcessingException, IOException {
+    final AtomicInteger imageCounter = new AtomicInteger();
+    final int totalImages = photosDatabase.getImageCount();
+
     Collection<ListenableFuture<List<Boolean>>> futures = new LinkedList<>();
 
     for (Entry<Pair<SourceId, String>, Image> imageEntry : photosDatabase.listImages()) {
@@ -88,14 +94,31 @@ public class PhotoHashingRunner {
         public void onSuccess(List<Boolean> result) {
           // If at least one of the tasks modified a resource write the modified image
           if (result.contains(true)) {
-            photosDatabase.writeImage(sourceId, image);
+            write();
           }
+          log();
         }
 
         @Override
         public void onFailure(Throwable t) {
           // Be safe and write
+          write();
+          log();
+        }
+
+        private void write() {
           photosDatabase.writeImage(sourceId, image);
+        }
+
+        private void log() {
+          statusLoggingExecutor.run(new Runnable() {
+            @Override
+            public void run() {
+              int processedImages = imageCounter.incrementAndGet();
+              int percent = (processedImages / totalImages) * 100;
+              LOGGER.info(percent + "% complete (" + processedImages + "/" + totalImages + ")");
+            }
+          });
         }
       });
 

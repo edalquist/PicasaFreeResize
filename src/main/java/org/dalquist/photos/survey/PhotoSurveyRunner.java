@@ -24,8 +24,7 @@ public class PhotoSurveyRunner {
         new AnnotationConfigApplicationContext(AppConfig.class)) {
       try {
         PhotoSurveyRunner runner = ctx.getBean(PhotoSurveyRunner.class);
-//        runner.run();
-        // TODO make this run idempotent
+        runner.run();
       } catch (Throwable t) {
         LOGGER.error("Something Broke", t);
         throw t;

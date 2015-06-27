@@ -3,7 +3,6 @@ package org.dalquist.photos.survey;
 import java.io.File;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.PreDestroy;
 
@@ -11,6 +10,7 @@ import org.dalquist.photos.survey.config.Config;
 import org.dalquist.photos.survey.model.Album;
 import org.dalquist.photos.survey.model.Image;
 import org.dalquist.photos.survey.model.SourceId;
+import org.joda.time.Period;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.slf4j.Logger;
@@ -26,14 +26,15 @@ public final class PhotosDatabase {
   private final DB db;
   private final Map<Pair<SourceId, String>, Image> imagesMap;
   private final Map<Pair<SourceId, String>, Album> albumsMap;
-  private final AtomicLong commitTimer = new AtomicLong(System.currentTimeMillis());
+  private final PeriodicExecutor commitExecutor = new PeriodicExecutor(Period.seconds(5));
 
   @Autowired
   public PhotosDatabase(Config config) {
     db = DBMaker.newFileDB(new File(config.getPhotoDbFile()))
         .cacheLRUEnable()
         .checksumEnable()
-//        .asyncWriteEnable()
+        .compressionEnable()
+        .mmapFileEnablePartial()
         .make();
     imagesMap = db.getHashMap("images");
     albumsMap = db.getHashMap("albums");
@@ -81,32 +82,25 @@ public final class PhotosDatabase {
     return imagesMap.entrySet();
   }
 
+  public int getImageCount() {
+    return imagesMap.size();
+  }
+
   private Pair<SourceId, String> getAlbumKey(SourceId sourceId, Album album) {
     return Pair.of(sourceId, album.getId());
-//    return toJsonArray("source", sourceId.getId(), "album", album.getId());
   }
 
   private Pair<SourceId, String> getImageKey(SourceId sourceId, Image image) {
     return Pair.of(sourceId, image.getId());
-//    return toJsonArray("source", sourceId.getId(), "image", image.getId());
   }
 
-//  private String toJsonArray(String... parts) {
-//    try {
-//      return ObjectMapperHolder.getObjectMapper().writeValueAsString(parts);
-//    } catch (JsonProcessingException e) {
-//      throw new RuntimeException(e);
-//    }
-//  }
-
   private void commit() {
-    long now = System.currentTimeMillis();
-    long last = commitTimer.get();
-    if ((now - last) > 5000) {
-      if (commitTimer.compareAndSet(last, now)) {
+    commitExecutor.run(new Runnable() {
+      @Override
+      public void run() {
         logger.info("Commit!");
         db.commit();
       }
-    }
+    });
   }
 }
