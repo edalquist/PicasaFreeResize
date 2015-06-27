@@ -151,9 +151,14 @@
       <version>2.7</version>
     </dependency>
     <dependency>
-        <groupId>com.zaxxer</groupId>
-        <artifactId>nuprocess</artifactId>
-        <version>0.9.4</version>
+      <groupId>com.zaxxer</groupId>
+      <artifactId>nuprocess</artifactId>
+      <version>0.9.4</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-math3</artifactId>
+      <version>3.5</version>
     </dependency>
   </dependencies>
 

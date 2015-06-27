@@ -4,29 +4,33 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
+import javax.annotation.PreDestroy;
+
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.dalquist.photos.survey.StdinShutdownListener.ShutdownRequested;
 import org.dalquist.photos.survey.config.Config;
 import org.dalquist.photos.survey.config.PathReplacement;
 import org.dalquist.photos.survey.config.Source;
 import org.dalquist.photos.survey.model.Image;
 import org.dalquist.photos.survey.model.Resource;
 import org.dalquist.photos.survey.model.SourceId;
-import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationListener;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -42,7 +46,8 @@ import com.zaxxer.nuprocess.NuProcess;
 import com.zaxxer.nuprocess.NuProcessBuilder;
 
 @Service
-public class PhotoHashingRunner {
+@DependsOn("PhotosDatabase")
+public class PhotoHashingRunner implements ApplicationListener<ShutdownRequested> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PhotoHashingRunner.class);
 
   public static void main(String[] args) throws Exception {
@@ -63,7 +68,12 @@ public class PhotoHashingRunner {
   private final Config config;
   private final PhotosDatabase photosDatabase;
   private final ListeningExecutorService execService;
-  private final PeriodicExecutor statusLoggingExecutor = new PeriodicExecutor(Period.seconds(5));
+  private final Map<Resource, ListenableFuture<Long>> futures = new ConcurrentHashMap<>();
+  private final DescriptiveStatistics procTimeStats = new DescriptiveStatistics(1000000);
+  private final DescriptiveStatistics completeTimeStats = new DescriptiveStatistics(1000000);
+  private final AtomicLong lastCompleted = new AtomicLong(System.nanoTime());
+  private final AtomicInteger imageCounter = new AtomicInteger(0);
+  private volatile boolean stopped = false;
 
   @Autowired
   public PhotoHashingRunner(Config config, PhotosDatabase photosDatabase,
@@ -73,13 +83,37 @@ public class PhotoHashingRunner {
     this.execService = execService;
   }
 
+  @Override
+  public void onApplicationEvent(ShutdownRequested event) {
+  }
+  @PreDestroy
+  public void shutdown() {
+    stopped = true;
+    try {
+      waitForRemainingFutures();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private String getLogPrefix() {
+    long ptMean = TimeUnit.NANOSECONDS.toMillis((long) procTimeStats.getMean());
+    long ctMean = TimeUnit.NANOSECONDS.toMillis((long) completeTimeStats.getMean());
+
+    int processedImages = imageCounter.get();
+    int totalImages = photosDatabase.getImageCount();
+    double percent = (processedImages / (double) totalImages) * 100;
+
+    return String.format("%,.2f%% (%d/%d) %,.2fs, %,.2fs - ", percent, processedImages,
+        totalImages, ptMean / 1000D, ctMean / 1000D);
+  }
+
   private void run() throws JsonProcessingException, IOException {
-    final AtomicInteger imageCounter = new AtomicInteger();
-    final int totalImages = photosDatabase.getImageCount();
-
-    Collection<ListenableFuture<List<Boolean>>> futures = new LinkedList<>();
-
     for (Entry<Pair<SourceId, String>, Image> imageEntry : photosDatabase.listImages()) {
+      if (stopped) {
+        return;
+      }
+
       final SourceId sourceId = imageEntry.getKey().first;
       Source source = config.getSource(sourceId);
       PathReplacement pathReplacement = source.getPathReplacement();
@@ -87,16 +121,23 @@ public class PhotoHashingRunner {
       Image image = imageEntry.getValue();
 
       // Trigger photo persist once both resources have been processed
-      @SuppressWarnings("unchecked")
-      ListenableFuture<List<Boolean>> imageFutures =
-          Futures.allAsList(submit(pathReplacement, image.getOriginal()),
-              submit(pathReplacement, image.getModified()));
+      ListenableFuture<Long> of =
+          submit(completeTimeStats, lastCompleted, pathReplacement, image.getOriginal());
+      ListenableFuture<Long> mf =
+          submit(completeTimeStats, lastCompleted, pathReplacement, image.getModified());
 
-      Futures.addCallback(imageFutures, new FutureCallback<List<Boolean>>() {
+      @SuppressWarnings("unchecked")
+      ListenableFuture<List<Long>> imageFutures = Futures.allAsList(of, mf);
+
+      Futures.addCallback(imageFutures, new FutureCallback<List<Long>>() {
         @Override
-        public void onSuccess(List<Boolean> result) {
+        public void onSuccess(List<Long> result) {
           // If at least one of the tasks modified a resource write the modified image
-          if (result.contains(true)) {
+          boolean write = false;
+          for (Long procTime : result) {
+            write = write || procTime >= 0;
+          }
+          if (write) {
             write();
           }
           imageCounter.incrementAndGet();
@@ -111,60 +152,71 @@ public class PhotoHashingRunner {
 
         private void write() {
           photosDatabase.writeImage(sourceId, image);
-
-          statusLoggingExecutor.run(new Runnable() {
-            @Override
-            public void run() {
-              int processedImages = imageCounter.get();
-              int percent = (processedImages / totalImages) * 100;
-              LOGGER.info(percent + "% complete (" + processedImages + "/" + totalImages + ")");
-            }
-          });
         }
       });
-
-
-      // Keep the list size down
-      for (Iterator<ListenableFuture<List<Boolean>>> futureItr = futures.iterator(); futureItr
-          .hasNext();) {
-        ListenableFuture<List<Boolean>> future = futureItr.next();
-        if (future.isDone()) {
-          try {
-            future.get();
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
-          } catch (ExecutionException e) {
-            Throwables.propagateIfPossible(e.getCause(), IOException.class);
-          }
-          futureItr.remove();
-        }
-      }
     }
 
+    waitForRemainingFutures();
+  }
+
+  private void waitForRemainingFutures() throws IOException {
+    LOGGER.info("Waiting on " + futures.size() + " tasks");
     try {
-      Futures.allAsList(futures).get();
+      Futures.allAsList(futures.values()).get();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     } catch (ExecutionException e) {
       Throwables.propagateIfPossible(e.getCause(), IOException.class);
+    } finally {
+      LOGGER.info(futures.size() + " tasks complete");
     }
   }
 
-  private ListenableFuture<Boolean> submit(PathReplacement pathReplacement, Resource resource) {
+  private ListenableFuture<Long> submit(final DescriptiveStatistics completeTimeStats,
+      final AtomicLong lastCompleted, PathReplacement pathReplacement, final Resource resource) {
     if (resource == null) {
-      return Futures.immediateFuture(false);
+      return Futures.immediateFuture(-1L);
     }
     if (resource.getMetadata() != null) {
-      LOGGER.info("Skipping: " + resource.getUrl());
-      return Futures.immediateFuture(false);
+      LOGGER.info("Skipping (alread has metadata): " + resource.getUrl());
+      return Futures.immediateFuture(-1L);
     }
-    return execService.submit(new MetaDataExtractor(config.getConvertBinary(), pathReplacement,
-        resource));
+
+    MetaDataExtractor extractor =
+        new MetaDataExtractor(config.getConvertBinary(), pathReplacement, resource);
+    ListenableFuture<Long> f = execService.submit(extractor);
+    LOGGER.info("Submitted: " + resource.getUrl());
+    futures.put(resource, f);
+    Futures.addCallback(f, new FutureCallback<Long>() {
+      @Override
+      public void onSuccess(Long result) {
+        procTimeStats.addValue(result);
+        onComplete(completeTimeStats, lastCompleted);
+      }
+
+      @Override
+      public void onFailure(Throwable t) {
+        onComplete(completeTimeStats, lastCompleted);
+      }
+
+      private void onComplete(final DescriptiveStatistics completeTimeStats,
+          final AtomicLong lastCompleted) {
+        futures.remove(resource);
+        long prev = lastCompleted.get();
+        long now = System.nanoTime();
+        long duration = now - prev;
+        if (duration > 0) {
+          lastCompleted.compareAndSet(prev, now);
+        }
+        completeTimeStats.addValue(Math.max(duration, 0));
+        LOGGER.info(getLogPrefix() + " Done: " + resource.getUrl());
+      }
+    });
+    return f;
   }
 
-  private static class MetaDataExtractor implements Callable<Boolean> {
+  private class MetaDataExtractor implements Callable<Long> {
     private final String convertBinary;
     private final PathReplacement pathReplacement;
     private final Resource resource;
@@ -178,16 +230,21 @@ public class PhotoHashingRunner {
 
     @Override
     @SuppressWarnings("unchecked")
-    public Boolean call() throws Exception {
+    public Long call() throws Exception {
+      if (stopped) {
+        return -1L;
+      }
+
+      long start = System.nanoTime();
       final String url = getUrl();
 
-      LOGGER.info("Start processing: " + url);
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug(getLogPrefix() + "Start: " + url);
+      }
 
       final StringBuilder stdoutBuilder = new StringBuilder();
       final StringBuilder stderrBuilder = new StringBuilder();
 
-      // ProcessBuilder pb = new ProcessBuilder(convertBinary, url, "-moments", "json:-");
-      // Process proc = pb.start();
       NuProcessBuilder pb = new NuProcessBuilder(convertBinary, url, "-moments", "json:-");
       pb.setProcessListener(new NuAbstractProcessHandler() {
         @Override
@@ -224,9 +281,7 @@ public class PhotoHashingRunner {
       metadata = (Map<String, Object>) metadata.get("image");
       resource.setMetadata(metadata);
 
-      LOGGER.info("End processing: " + url);
-
-      return true;
+      return System.nanoTime() - start;
     }
 
     private String getUrl() {

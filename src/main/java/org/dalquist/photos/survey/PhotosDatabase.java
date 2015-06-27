@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 
 import com.google.gdata.util.common.base.Pair;
 
-@Service
+@Service("PhotosDatabase")
 public final class PhotosDatabase {
   private final Logger logger = LoggerFactory.getLogger(getClass());
   private final DB db;

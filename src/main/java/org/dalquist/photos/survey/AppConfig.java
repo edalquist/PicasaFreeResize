@@ -13,6 +13,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.util.concurrent.ForwardingListeningExecutorService;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
@@ -21,9 +22,9 @@ import com.google.common.util.concurrent.MoreExecutors;
 public class AppConfig {
   protected final Logger logger = LoggerFactory.getLogger(getClass());
 
-  @Bean
+  @Bean(destroyMethod = "shutdown")
   public ListeningExecutorService createListeningExecutorService() {
-    int cores = Runtime.getRuntime().availableProcessors();
+    int cores = (int) (Runtime.getRuntime().availableProcessors() * 1) - 1;
     logger.info("Starting with {} cores", cores);
 
     ThreadPoolExecutor tpe =
@@ -31,8 +32,26 @@ public class AppConfig {
             new LinkedBlockingQueue<Runnable>(cores * 4), new ThreadPoolExecutor.CallerRunsPolicy());
     ListeningExecutorService les = MoreExecutors.listeningDecorator(tpe);
 
-    return les;
-//    return MoreExecutors.newDirectExecutorService();
+    return new ForwardingListeningExecutorService() {
+      @Override
+      public void shutdown() {
+        logger.info("Requesting thread pool shutdown");
+        super.shutdown();
+        try {
+          logger.info("Waiting for thread pool termination");
+          super.awaitTermination(5, TimeUnit.MINUTES);
+          logger.info("Thread pool terminated");
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new RuntimeException(e);
+        }
+      }
+
+      @Override
+      protected ListeningExecutorService delegate() {
+        return les;
+      }
+    };
   }
 
   @Bean
