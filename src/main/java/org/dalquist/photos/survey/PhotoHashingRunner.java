@@ -274,9 +274,7 @@ public class PhotoHashingRunner implements ApplicationListener<ShutdownRequested
       });
 
       NuProcess proc = pb.start();
-      while (proc.isRunning()) {
-        proc.waitFor(1, TimeUnit.SECONDS);
-      }
+      proc.waitFor(30, TimeUnit.SECONDS);
 
       ObjectMapper objectMapper = ObjectMapperHolder.getObjectMapper();
       Map<String, Object> metadata = objectMapper.readValue(stdoutBuilder.toString(), Map.class);
