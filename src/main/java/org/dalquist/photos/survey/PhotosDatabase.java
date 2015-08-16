@@ -3,6 +3,7 @@ package org.dalquist.photos.survey;
 import java.io.File;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 
 import javax.annotation.PreDestroy;
 
@@ -26,7 +27,7 @@ public final class PhotosDatabase {
   private final DB db;
   private final Map<Pair<SourceId, String>, Image> imagesMap;
   private final Map<Pair<SourceId, String>, Album> albumsMap;
-  private final PeriodicExecutor commitExecutor = new PeriodicExecutor(Period.seconds(5));
+  private final PeriodicExecutor commitExecutor = new PeriodicExecutor(Period.seconds(15));
 
   @Autowired
   public PhotosDatabase(Config config) {
@@ -98,8 +99,10 @@ public final class PhotosDatabase {
     commitExecutor.run(new Runnable() {
       @Override
       public void run() {
-        logger.info("Commit!");
+        long start = System.nanoTime();
         db.commit();
+        long duration = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+        logger.info("Committed DB in {}ms", duration);
       }
     });
   }
