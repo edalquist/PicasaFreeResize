@@ -11,6 +11,7 @@ public class Config extends JsonObject {
   private String photoDbFile;
   private String convertBinary;
   private Credentials firebaseCredentials;
+  private String destDir;
   private List<Source> sources;
 
   public String getPhotoDbFile() {
@@ -21,6 +22,14 @@ public class Config extends JsonObject {
     this.photoDbFile = photoDbFile;
   }
 
+  public Credentials getFirebaseCredentials() {
+    return firebaseCredentials;
+  }
+
+  public void setFirebaseCredentials(Credentials firebaseCredentials) {
+    this.firebaseCredentials = firebaseCredentials;
+  }
+
   public String getConvertBinary() {
     return convertBinary;
   }
@@ -29,12 +38,12 @@ public class Config extends JsonObject {
     this.convertBinary = convertBinary;
   }
 
-  public Credentials getFirebaseCredentials() {
-    return firebaseCredentials;
+  public String getDestDir() {
+    return destDir;
   }
 
-  public void setFirebaseCredentials(Credentials firebaseCredentials) {
-    this.firebaseCredentials = firebaseCredentials;
+  public void setDestDir(String destDir) {
+    this.destDir = destDir;
   }
 
   public List<Source> getSources() {

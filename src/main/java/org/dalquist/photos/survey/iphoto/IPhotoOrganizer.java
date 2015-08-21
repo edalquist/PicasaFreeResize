@@ -2,6 +2,7 @@ package org.dalquist.photos.survey.iphoto;
 
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.ParseException;
@@ -12,6 +13,7 @@ import java.util.TreeMap;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.dalquist.photos.survey.PhotoOrganizer;
+import org.dalquist.photos.survey.PhotoProcessor;
 import org.dalquist.photos.survey.PhotosDatabase;
 import org.dalquist.photos.survey.config.Source;
 import org.dalquist.photos.survey.model.Album;
@@ -37,19 +39,27 @@ public class IPhotoOrganizer implements PhotoOrganizer {
   }
 
   @Override
-  public void loadPhotoEntries(PhotosDatabase pdb) throws IOException {
-    NSDictionary rootDict;
-    try (InputStream is = new BufferedInputStream(new FileInputStream(albumXml))) {
-      rootDict = (NSDictionary) PropertyListParser.parse(is);
-    } catch (PropertyListFormatException | ParseException | ParserConfigurationException
-        | SAXException e) {
-      throw new IOException(e);
+  public void organizePhotos(PhotoProcessor pp) throws IOException {
+    NSDictionary rootDict = readPhotoDict();
+
+    NSDictionary imagesDict = (NSDictionary) rootDict.get("Master Image List");
+
+    // organize each image
+    for (final Entry<String, NSObject> mediaEntry : imagesDict.entrySet()) {
+      Image media = transformEntry(mediaEntry.getKey(), mediaEntry.getValue());
+      if (media != null) {
+        pp.processImage(media);
+      }
     }
+  }
+
+  @Override
+  public void loadPhotoEntries(PhotosDatabase pdb) throws IOException {
+    NSDictionary rootDict = readPhotoDict();
 
     NSDictionary imagesDict = (NSDictionary) rootDict.get("Master Image List");
 
     Map<String, Image> imageMap = new TreeMap<>();
-
     // Convert each image
     for (final Entry<String, NSObject> mediaEntry : imagesDict.entrySet()) {
       Image media = transformEntry(mediaEntry.getKey(), mediaEntry.getValue());
@@ -82,7 +92,7 @@ public class IPhotoOrganizer implements PhotoOrganizer {
         img.addAlbum(album);
         album.addImage(img);
       }
-      pdb.writeAlbum(sourceId, album);
+//      pdb.writeAlbum(sourceId, album);
     }
 
     NSArray rollsArray = (NSArray) rootDict.get("List of Rolls");
@@ -103,10 +113,19 @@ public class IPhotoOrganizer implements PhotoOrganizer {
         img.addAlbum(album);
         album.addImage(img);
       }
-      pdb.writeAlbum(sourceId, album);
+//      pdb.writeAlbum(sourceId, album);
     }
 
-    pdb.writeImages(sourceId, imageMap.values());
+//    pdb.writeImages(sourceId, imageMap.values());
+  }
+
+  private NSDictionary readPhotoDict() throws IOException, FileNotFoundException {
+    try (InputStream is = new BufferedInputStream(new FileInputStream(albumXml))) {
+      return (NSDictionary) PropertyListParser.parse(is);
+    } catch (PropertyListFormatException | ParseException | ParserConfigurationException
+        | SAXException e) {
+      throw new IOException(e);
+    }
   }
 
   private static Integer nsToInt(NSObject obj) {

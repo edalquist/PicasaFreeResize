@@ -3,6 +3,7 @@ package org.dalquist.photos.survey.picasa;
 import java.io.IOException;
 
 import org.dalquist.photos.survey.PhotoOrganizer;
+import org.dalquist.photos.survey.PhotoProcessor;
 import org.dalquist.photos.survey.PhotosDatabase;
 import org.dalquist.photos.survey.config.Source;
 import org.dalquist.photos.survey.model.Image;
@@ -25,6 +26,11 @@ public class PicasaPhotoOrganizer implements PhotoOrganizer {
     String username = (String) config.get("username");
     String password = (String) config.get("password");
     this.picasaService = new SimplePicasaServiceImpl(username, password);
+  }
+
+  @Override
+  public void organizePhotos(PhotoProcessor pp) throws IOException {
+    // TODO Auto-generated method stub
   }
 
   @Override

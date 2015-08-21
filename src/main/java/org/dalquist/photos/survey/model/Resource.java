@@ -10,7 +10,8 @@ public class Resource extends JsonObject implements Comparable<Resource> {
   private static final long serialVersionUID = 1L;
 
   private String url;
-  private Map<String, Object> metadata;
+  private String destFile;
+  private String destMetadataFile;
 
   @Override
   public int compareTo(Resource o) {
@@ -27,11 +28,19 @@ public class Resource extends JsonObject implements Comparable<Resource> {
     this.url = url;
   }
 
-  public synchronized Map<String, Object> getMetadata() {
-    return metadata;
+  public String getDestFile() {
+    return destFile;
   }
 
-  public synchronized void setMetadata(Map<String, Object> metadata) {
-    this.metadata = metadata;
+  public void setDestFile(String destFile) {
+    this.destFile = destFile;
+  }
+
+  public String getDestMetadataFile() {
+    return destMetadataFile;
+  }
+
+  public void setDestMetadataFile(String destMetadataFile) {
+    this.destMetadataFile = destMetadataFile;
   }
 }

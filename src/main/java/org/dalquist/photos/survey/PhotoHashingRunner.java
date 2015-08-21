@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -46,7 +48,6 @@ import com.zaxxer.nuprocess.NuProcess;
 import com.zaxxer.nuprocess.NuProcessBuilder;
 
 @Service
-@DependsOn("PhotosDatabase")
 public class PhotoHashingRunner implements ApplicationListener<ShutdownRequested> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PhotoHashingRunner.class);
 
@@ -101,7 +102,7 @@ public class PhotoHashingRunner implements ApplicationListener<ShutdownRequested
     long ctMean = TimeUnit.NANOSECONDS.toMillis((long) completeTimeStats.getMean());
 
     int processedImages = imageCounter.get();
-    int totalImages = photosDatabase.getImageCount();
+    int totalImages = 0;//photosDatabase.getImageCount();
     double percent = (processedImages / (double) totalImages) * 100;
 
     return String.format("%,.2f%% (%d/%d) %,.2fs, %,.2fs - ", percent, processedImages,
@@ -109,7 +110,8 @@ public class PhotoHashingRunner implements ApplicationListener<ShutdownRequested
   }
 
   private void run() throws JsonProcessingException, IOException {
-    for (Entry<Pair<SourceId, String>, Image> imageEntry : photosDatabase.listImages()) {
+    //photosDatabase.listImages()
+    for (Entry<Pair<SourceId, String>, Image> imageEntry : Collections.<Entry<Pair<SourceId, String>, Image>>emptySet()) {
       if (stopped) {
         return;
       }
@@ -151,7 +153,7 @@ public class PhotoHashingRunner implements ApplicationListener<ShutdownRequested
         }
 
         private void write() {
-          photosDatabase.writeImage(sourceId, image);
+//          photosDatabase.writeImage(sourceId, image);
         }
       });
     }
@@ -178,10 +180,10 @@ public class PhotoHashingRunner implements ApplicationListener<ShutdownRequested
     if (resource == null) {
       return Futures.immediateFuture(-1L);
     }
-    if (resource.getMetadata() != null) {
-      LOGGER.info("Skipping (alread has metadata): " + resource.getUrl());
-      return Futures.immediateFuture(-1L);
-    }
+//    if (resource.getMetadata() != null) {
+//      LOGGER.info("Skipping (alread has metadata): " + resource.getUrl());
+//      return Futures.immediateFuture(-1L);
+//    }
 
     MetaDataExtractor extractor =
         new MetaDataExtractor(config.getConvertBinary(), pathReplacement, resource);
@@ -280,7 +282,7 @@ public class PhotoHashingRunner implements ApplicationListener<ShutdownRequested
       Map<String, Object> metadata = objectMapper.readValue(stdoutBuilder.toString(), Map.class);
 
       metadata = (Map<String, Object>) metadata.get("image");
-      resource.setMetadata(metadata);
+//      resource.setMetadata(metadata);
 
       return System.nanoTime() - start;
     }

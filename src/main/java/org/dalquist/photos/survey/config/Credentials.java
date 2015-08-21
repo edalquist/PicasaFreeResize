@@ -4,6 +4,8 @@ import org.dalquist.photos.survey.model.JsonObject;
 
 
 public class Credentials extends JsonObject {
+  private static final long serialVersionUID = 1L;
+
   private String email;
   private String password;
 

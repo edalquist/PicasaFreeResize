@@ -11,6 +11,7 @@ import java.util.Properties;
 import org.dalquist.photos.survey.picasa.SimplePicasaServiceImpl;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.runners.MockitoJUnitRunner;
@@ -21,6 +22,7 @@ import com.google.gdata.data.photos.AlbumEntry;
 import com.google.gdata.util.AuthenticationException;
 import com.google.gdata.util.ServiceException;
 
+@Ignore
 @RunWith(MockitoJUnitRunner.class)
 public class SimplePicasaServiceImplTest {
   private static ImmutableMap<String, String> testConfig;

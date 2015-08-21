@@ -8,19 +8,17 @@ import java.io.InputStream;
 import java.util.Properties;
 
 import org.dalquist.photos.survey.PhotoOrganizer;
-import org.dalquist.photos.survey.PhotosDatabase;
-import org.dalquist.photos.survey.picasa.PicasaPhotoOrganizer;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.Ignore;
 import org.junit.runner.RunWith;
 import org.mockito.runners.MockitoJUnitRunner;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.gdata.util.AuthenticationException;
-import com.google.gdata.util.ServiceException;
 
+@Ignore
 @RunWith(MockitoJUnitRunner.class)
 public class PicasaPhotoOrganizerTest {
   private static ImmutableMap<String, String> testConfig;
