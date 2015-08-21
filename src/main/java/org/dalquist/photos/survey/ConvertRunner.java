@@ -3,7 +3,6 @@ package org.dalquist.photos.survey;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.ByteBuffer;
@@ -95,31 +94,31 @@ public class ConvertRunner {
 
     @Override
     public void onPreStart(NuProcess nuProcess) {
-      LOGGER.info("onPreStart");
+      //LOGGER.info("onPreStart");
       this.nuProcess = nuProcess;
     }
 
     @Override
     public void onStart(NuProcess nuProcess) {
-      LOGGER.info("onStart");
+      //LOGGER.info("onStart");
       nuProcess.wantWrite();
     }
 
     @Override
     public void onStdout(ByteBuffer buffer) {
-      LOGGER.info("onStdout");
+      //LOGGER.info("onStdout");
       stdout.write(buffer);
     }
 
     @Override
     public void onStderr(ByteBuffer buffer) {
-      LOGGER.info("onStderr");
+      //LOGGER.info("onStderr");
       stderr.write(buffer);
     }
 
     @Override
     public void onExit(int exitCode) {
-      LOGGER.info("onExit");
+      //LOGGER.info("onExit");
       if (exitCode != 0) {
         // Process completed with error
         // Complete future with exception and stderr
@@ -140,7 +139,7 @@ public class ConvertRunner {
 
     @Override
     public boolean onStdinReady(ByteBuffer buffer) {
-      LOGGER.info("onStdinReady");
+      //LOGGER.info("onStdinReady");
       if (!dataRead) {
         nuProcess.closeStdin();
         return false;

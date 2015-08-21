@@ -27,11 +27,12 @@ public class AppConfig {
     int cores = (int) (Runtime.getRuntime().availableProcessors() * 1) - 1;
     logger.info("Starting with {} cores", cores);
 
-//    ThreadPoolExecutor tpe =
-//        new ThreadPoolExecutor(cores, cores, 60, TimeUnit.SECONDS,
-//            new LinkedBlockingQueue<Runnable>(cores * 4), new ThreadPoolExecutor.CallerRunsPolicy());
-//    ListeningExecutorService les = MoreExecutors.listeningDecorator(tpe);
-    ListeningExecutorService les = MoreExecutors.newDirectExecutorService();
+    ThreadPoolExecutor tpe =
+        new ThreadPoolExecutor(cores, cores, 60, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<Runnable>(cores * 4), new ThreadPoolExecutor.CallerRunsPolicy());
+    ListeningExecutorService les = MoreExecutors.listeningDecorator(tpe);
+    
+//    ListeningExecutorService les = MoreExecutors.newDirectExecutorService();
 
     return new ForwardingListeningExecutorService() {
       @Override

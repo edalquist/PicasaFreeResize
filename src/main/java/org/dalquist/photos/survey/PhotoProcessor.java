@@ -6,6 +6,7 @@ import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -99,49 +100,23 @@ public class PhotoProcessor {
         try (ReadableByteChannel resourceInChannel = openChannel(url)) {
           LOGGER.info("Copying " + url + " to: " + tmpFile);
 
-          Future<JsonNode> jsonFuture = convertRunner.generateImageJson(new ReadableByteChannel() {
-            private boolean open = true;
-
-            @Override
-            public boolean isOpen() {
-              return open;
-            }
-
-            @Override
-            public void close() throws IOException {
-              open = false;
-              // noop
-            }
-
-            @Override
-            public int read(ByteBuffer dst) throws IOException {
-              if (!open) {
-                throw new ClosedChannelException();
-              }
-
-              // Read image bytes into the dst buffer
-              int bytesRead = resourceInChannel.read(dst);
-              if (bytesRead < 0) {
-                open = false;
-                return bytesRead;
-              }
-
-              // Create a transfer buffer of the same data and flip it
-              ByteBuffer transferBuffer = dst.duplicate();
-              transferBuffer.flip();
-
-              // Write the read bytes to the temp file
-              while (transferBuffer.hasRemaining()) {
-                tmpDestChannel.write(transferBuffer);
-              }
-
-              return bytesRead;
-            }
-          });
+          TeeReadableByteChannel teeChannel =
+              new TeeReadableByteChannel(resourceInChannel, tmpDestChannel);
+          Future<JsonNode> jsonFuture = convertRunner.generateImageJson(teeChannel);
 
           JsonNode jsonNode = jsonFuture.get();
           LOGGER.info("Copied " + url + " to: " + tmpFile);
           LOGGER.info("JSON: " + jsonNode);
+
+          if (useTmpFile) {
+            // determine Image path based on jsonNode data
+          }
+
+          // move temp file to dest path
+          // write JSON to dest path
+
+          // TODO retain filesystem date/time or http lastModified?
+          // Files.move(tmpFile, destFile)
         } catch (IOException e) {
           LOGGER.error("Copy " + url + " to: " + tmpFile + " FAILED", e);
           throw e;
@@ -152,11 +127,58 @@ public class PhotoProcessor {
         } catch (IOException e) {
         }
       }
-      // Figure out new DEST path
 
-      // Move temp file to DEST path
-
+      // return dest path
       return null;
+    }
+  }
+
+  private static final class TeeReadableByteChannel implements ReadableByteChannel {
+    private final ReadableByteChannel input;
+    private final WritableByteChannel teeOutput;
+    private volatile boolean open = true;
+
+    private TeeReadableByteChannel(ReadableByteChannel resourceInChannel,
+        WritableByteChannel tmpDestChannel) {
+      this.input = resourceInChannel;
+      this.teeOutput = tmpDestChannel;
+    }
+
+    @Override
+    public boolean isOpen() {
+      return open;
+    }
+
+    @Override
+    public void close() throws IOException {
+      open = false;
+    }
+
+    @Override
+    public int read(ByteBuffer dst) throws IOException {
+      if (!open) {
+        throw new ClosedChannelException();
+      }
+
+      // Read bytes directly into the dst buffer
+      int bytesRead = input.read(dst);
+      if (bytesRead < 0) {
+        open = false;
+        return bytesRead;
+      }
+
+      // Create a transfer buffer of the same data and flip it
+      ByteBuffer transferBuffer = dst.duplicate();
+      transferBuffer.flip();
+
+      // Write the read bytes to the tee output, this is effectively blocking I/O since we need to
+      // loop until the output has accepted all of the data in the transfer buffer.
+      while (transferBuffer.hasRemaining()) {
+        teeOutput.write(transferBuffer);
+      }
+
+      // Return the number of bytes read into the dst buffer
+      return bytesRead;
     }
   }
 }
