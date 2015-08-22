@@ -47,9 +47,7 @@ public class IPhotoOrganizer implements PhotoOrganizer {
     // organize each image
     for (final Entry<String, NSObject> mediaEntry : imagesDict.entrySet()) {
       Image media = transformEntry(mediaEntry.getKey(), mediaEntry.getValue());
-      if (media != null) {
-        pp.processImage(media);
-      }
+      pp.processImage(sourceId, media);
     }
   }
 

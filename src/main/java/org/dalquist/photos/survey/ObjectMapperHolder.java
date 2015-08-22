@@ -2,7 +2,6 @@ package org.dalquist.photos.survey;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.joda.JodaModule;
 
 public class ObjectMapperHolder {
   private static class LazyHolder {
@@ -18,6 +17,6 @@ public class ObjectMapperHolder {
   private ObjectMapperHolder() {
     objectMapper = new ObjectMapper();
     objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
-    objectMapper.registerModule(new JodaModule());
+//    objectMapper.registerModule(new JodaModule());
   }
 }
